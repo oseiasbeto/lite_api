@@ -2,62 +2,111 @@ const mongoose = require("mongoose");
 
 const post = new mongoose.Schema(
   {
+    post_type: {
+      type: String,
+      enum: ['question', 'post', 'answer'],
+      default: 'question',
+      index: true
+    },
+
+    title: {
+      type: String,
+      trim: true,
+      maxlength: 300
+    },
+
     content: {
       type: String,
-      required: function () {
-        if (!this.media.length && !this.shared_post) return true;
-        else return false;
-      },
       maxlength: 280,
-      trim: true,
+      trim: true
     },
+
     author: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true
     },
+
+    topics: [
+      {
+        type: String,
+        trim: true,
+        lowercase: true
+      },
+    ],
+
     bookmarks: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+
     bookmarks_count: {
       type: Number,
       default: 0,
     },
+
     shares_count: {
       type: Number,
       default: 0,
     },
-    likes: [
+
+    upvotes: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
-    likes_count: {
+
+    upvotes_count: {
       type: Number,
       default: 0,
     },
-    dislikes: [
+
+    downvotes: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
-    dislikes_count: {
+
+    downvotes_count: {
       type: Number,
       default: 0,
     },
+
+    views_count: {
+      type: Number,
+      default: 0,
+    },
+
     comments_count: {
       type: Number,
       default: 0,
     },
+
     shared_post: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
       default: null
+    },
+
+    shares_count: {
+      type: Number,
+      default: 0,
+    },
+
+    is_anonymous: {
+      type: Boolean,
+      default: false
+    },
+
+    status: {
+      type: String,
+      enum: ['active', 'deleted', 'hidden', 'reported'],
+      default: 'active'
     },
     mentions: [
       {
@@ -77,28 +126,11 @@ const post = new mongoose.Schema(
   }
 );
 
-// Middleware para processamento antes de salvar
-post.pre("save", function (next) {
-  const post = this;
-
-  // Extrair hashtags
-  if (post.content) {
-    const hashtagRegex = /#(\w+)/g;
-    const hashtags = post.content.match(hashtagRegex);
-    if (hashtags) {
-      post.hashtags = [
-        ...new Set(hashtags.map((tag) => tag.substring(1).toLowerCase())),
-      ];
-    }
-  }
-
-  next();
-});
-
 // Índices para melhorar performance nas buscas
-post.index({ author: 1, created_at: -1 });
-post.index({ hashtags: 1 });
-post.index({ created_at: -1 });
+post.index({ title: 'text', content: 'text', topics: 'text' });
+post.index({ post_type: 1, created_at: -1 });
+post.index({ author: 1, post_type: 1 });
+post.index({ shared_post: 1, created_at: -1 })
 
 const Post = mongoose.model("Post", post);
 

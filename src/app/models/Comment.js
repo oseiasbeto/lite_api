@@ -5,55 +5,79 @@ const comment = new mongoose.Schema(
     content: {
       type: String,
       required: function () {
-        if (!this.media.length && !this.is_repost) return true;
+        if (!this.media.length) return true;
         else return false;
       },
-      maxlength: 280,
+      maxlength: 2000,
       trim: true,
     },
+
     author: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true
     },
+
     post: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
       required: true,
+      index: true
     },
+
     parent: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Comment",
-      default: null
+      default: null,
+      index: true
     },
-    likes: [
+
+    is_anonymous: {
+      type: Boolean,
+      default: false
+    },
+
+    status: {
+      type: String,
+      enum: ['active', 'deleted', 'hidden', 'reported'],
+      default: 'active'
+    },
+
+    upvotes: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
-    likes_count: {
+
+    upvotes_count: {
       type: Number,
       default: 0,
     },
-    dislikes: [
+
+    downvotes: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
-    dislikes_count: {
+
+    downvotes_count: {
       type: Number,
       default: 0,
     },
+
     replies_count: {
       type: Number,
       default: 0,
     },
+
     replied_user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     },
+
     mentions: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -74,8 +98,8 @@ const comment = new mongoose.Schema(
 
 // Índices para melhorar performance nas buscas
 comment.index({ author: 1, created_at: -1 });
-comment.index({ hashtags: 1 });
-comment.index({ created_at: -1 });
+comment.index({ parent: 1, created_at: -1 });
+comment.index({ post: 1, created_at: -1 });
 
 const Comment = mongoose.model("Comment", comment);
 

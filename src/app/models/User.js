@@ -135,6 +135,10 @@ const userSchema = new mongoose.Schema(
     // === CONTADORES ===
     unread_messages_count: { type: Number, default: 0 },
     unread_notifications_count: { type: Number, default: 0 },
+    reputation: { type: Number, default: 0 },
+    total_answers: { type: Number, default: 0 },
+    total_upvotes_recived: { type: Number, default: 0 },
+    total_downvotes_recived: { type: Number, default: 0 },
     posts_count: { type: Number, default: 0 },
     followers_count: { type: Number, default: 0 },
     following_count: { type: Number, default: 0 },
@@ -162,6 +166,8 @@ const userSchema = new mongoose.Schema(
       notification: {
         email: { type: Boolean, default: true },
         push: { type: Boolean, default: true },
+        new_answer_on_my_question: { type: Boolean, default: true },
+        someone_upvotes_my_question: { type: Boolean, default: true }
       },
       language: {
         type: String,
