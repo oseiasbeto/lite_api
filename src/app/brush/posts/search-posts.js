@@ -1,5 +1,5 @@
-const Post = require("../../../models/Post");
-const User = require("../../../models/User");
+const Post = require("../../models/Post");
+const User = require("../../models/User");
 
 /**
  * Busca posts por texto com paginação, excluindo posts do usuário logado e bloqueados, com ordenação por relevância ou recência.

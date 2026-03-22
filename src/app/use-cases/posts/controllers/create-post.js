@@ -6,11 +6,27 @@ const User = require("../../../models/User.js");
 
 const createPost = async (req, res) => {
   try {
-    const { content, media, sharedPost } = req.body;
+    const { 
+      content, 
+      media, 
+      postTitle, 
+      privacy, 
+      isAnonymous, 
+      topics,
+      postType = 'question', 
+      sharedPost 
+    } = req.body;
+
     const userId = req.user.id;
 
+
+    if (postType === 'question' && !postTitle)
+      return res.status(400).json({
+        success: false,
+        message: "Informe a pergunta"
+      })
     // Validação manual
-    if (!content.trim() && media.length === 0) {
+    if (!content.trim() && media.length === 0 && postType !== 'question') {
       return res.status(400).json({
         success: false,
         error: "O post deve conter texto ou mídia",
@@ -109,6 +125,11 @@ const createPost = async (req, res) => {
     const newPost = await Post.create({
       content,
       author: userId,
+      title: postTitle ? postTitle : '',
+      post_type: postType ? postType : 'question',
+      is_anonymous: isAnonymous ? isAnonymous : false,
+      topics: topics ? topics : [],
+      privacy: privacy,
       media: mediaDocs,
       shared_post: sharedPost ?? undefined,
     });

@@ -1,10 +1,9 @@
-const Comment = require("../../../models/Comment");
-const User = require("../../../models/User");
+const Post = require("../../models/Post");
+const User = require("../../models/User");
 
-const getCommentsByParentId = async (req, res) => {
+const getBookmarkPosts = async (req, res) => {
   try {
     const userId = req.user.id; // ID do usuário logado
-    const parentId = req.params.id
     const page = parseInt(req.query.page) || 1; // Página atual (padrão: 1)
     const limit = parseInt(req.query.limit) || 10; // Limite por página (padrão: 10)
     const skip = (page - 1) * limit; // Quantidade de documentos a pular
@@ -13,7 +12,7 @@ const getCommentsByParentId = async (req, res) => {
 
     // Buscar informações do usuário logado para excluir posts próprios e bloqueados
     const currentUser = await User.findById(userId)
-      .select("blocked_users")
+      .select("_id")
       .lean();
     if (!currentUser) {
       return res.status(404).json({ message: "Usuário não encontrado." });
@@ -21,10 +20,13 @@ const getCommentsByParentId = async (req, res) => {
 
     // Busca notificações com paginação, ordenadas por created_at (descendente)
     const filter = {
-      parent: parentId
+      $and: [
+        { bookmarks: currentUser._id }
+      ],
     };
 
-    const comments = await Comment.find(filter)
+    const posts = await Post.find(filter)
+      .sort({ created_at: -1 }) // Mais recentes primeiro
       .skip(skip)
       .limit(limit)
       .populate({
@@ -34,51 +36,46 @@ const getCommentsByParentId = async (req, res) => {
       .populate(
         "author",
         "name verified is_online profile_image"
-      )
-      .populate(
-        "replied_user",
-        "name verified is_online profile_image"
-      )
+      ) // Popula username e profile_picture
       .populate({
-        path: "parent",
+        path: "shared_post",
         populate: [
           {
             path: "author",
-            select:
-              "name verified is_online profile_image",
+            select: "name verified is_online profile_image",
           },
           {
             path: "media",
-            select: "url _id type format thumbnail duration post",
+            select: "url type thumbnail format width height duration",
           }
-        ],
+        ]
       })
       .lean(); // Converte para objeto JavaScript puro
 
     // Conta o total de notificações para calcular totalPages
-    let totalComments;
+    let total;
 
     if (!isLoad) {
-      totalComments = await Comment.countDocuments({
-        parent: parentId
+      total = await Post.countDocuments({
+        $and: [{ author: { $nin: currentUser.blocked_users || [] } }]
       });
     } else {
-      totalComments = totalItems;
+      total = totalItems;
     }
-    const totalPages = Math.ceil(totalComments / limit);
+    const totalPages = Math.ceil(total / limit);
 
     // Formata a resposta
     res.status(200).json({
-      comments,
+      posts,
       page,
       totalPages,
-      total: totalComments,
+      total,
       hasMore: page < totalPages, // Indica se há mais páginas
     });
   } catch (err) {
-    console.error("Erro ao buscar as respostas:", err);
+    console.error("Erro ao buscar os favoritos:", err);
     res.status(500).json({ message: "Erro interno no servidor." });
   }
 };
 
-module.exports = getCommentsByParentId;
+module.exports = getBookmarkPosts;

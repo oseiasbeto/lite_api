@@ -4,7 +4,7 @@ const post = new mongoose.Schema(
   {
     post_type: {
       type: String,
-      enum: ['question', 'post', 'answer'],
+      enum: ['question', 'post'],
       default: 'question',
       index: true
     },
@@ -30,10 +30,9 @@ const post = new mongoose.Schema(
 
     topics: [
       {
-        type: String,
-        trim: true,
-        lowercase: true
-      },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Topic",
+      }
     ],
 
     bookmarks: [
@@ -108,6 +107,12 @@ const post = new mongoose.Schema(
       enum: ['active', 'deleted', 'hidden', 'reported'],
       default: 'active'
     },
+
+    privacy: {
+      type: String,
+      default: 'public'
+    },
+    
     mentions: [
       {
         type: mongoose.Schema.Types.ObjectId,

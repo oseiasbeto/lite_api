@@ -1,6 +1,6 @@
-const Post = require("../../../models/Post")
-const Media = require("../../../models/Media");
-const Comment = require("../../../models/Comment");
+const Post = require("../../models/Post")
+const Media = require("../../models/Media");
+const Comment = require("../../models/Comment");
 
 const deletePost = async (req, res) => {
     try {

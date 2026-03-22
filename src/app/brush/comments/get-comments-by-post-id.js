@@ -1,4 +1,4 @@
-const Comment = require("../../../models/Comment");
+const Comment = require("../../models/Comment");
 const mongoose = require("mongoose")
 
 const getCommentsByPostId = async (req, res) => {

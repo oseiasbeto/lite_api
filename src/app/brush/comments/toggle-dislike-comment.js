@@ -1,5 +1,5 @@
-const Comment = require("../../../models/Comment");
-const User = require("../../../models/User");
+const Comment = require("../../models/Comment");
+const User = require("../../models/User");
 //const Notification = require("../../../models/Notification");
 //const { getIO } = require("../../../services/socket");
 
