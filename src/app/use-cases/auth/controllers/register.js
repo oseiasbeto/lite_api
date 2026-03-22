@@ -34,22 +34,22 @@ const register = async (req, res) => {
           existingUser.email_code_expires = codeExpires
 
           if (existingUser.email_code_attempts < 5) {
-              existingUser.email_code_attempts += 1
+            existingUser.email_code_attempts += 1
           }
-          
+
           await existingUser.save()
 
           if (existingUser.email_code_attempts < 5) {
-              /*
-           Envia e-mail com código
-          sendVerificationEmail({
-            to: user.email,
-            name: user.name,
-            code: verificationCode
-          }); 
-          */
+            /*
+         Envia e-mail com código
+        sendVerificationEmail({
+          to: user.email,
+          name: user.name,
+          code: verificationCode
+        }); 
+        */
           }
-          
+
           return res.status(200).send()
         } else return res.status(400).send({
           message: "Algo deu errado."
@@ -69,7 +69,10 @@ const register = async (req, res) => {
 
       await user.save();
 
-      /*
+      const appEnv = process.env?.NODE_ENV || 'dev'
+
+      if (appEnv === 'prod') {
+        /*
       // 6. Envia e-mail com código
       await sendVerificationEmail({
         to: user.email,
@@ -77,6 +80,10 @@ const register = async (req, res) => {
         code: verificationCode
       }); 
       */
+      } else {
+        console.log("OTP de registro de conta:", verificationCode)
+      }
+
 
       // 7. Resposta de sucesso
       res.status(201).json({

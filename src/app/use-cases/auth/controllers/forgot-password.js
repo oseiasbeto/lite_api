@@ -1,5 +1,5 @@
-const User = require('../../../models/User'); 
-const moment = require('moment'); 
+const User = require('../../../models/User');
+const moment = require('moment');
 const crypto = require('crypto');
 //const sendMail = require('../../../mail/sendMail');
 
@@ -8,10 +8,10 @@ const forgotPassword = async (req, res) => {
         const { email } = req.body; // Obtém o e-mail do corpo da requisição
 
         if (!email) {
-            return res.status(400).json({ message: "O e-mail é obrigatório." }); 
+            return res.status(400).json({ message: "O e-mail é obrigatório." });
         }
 
-        const user = await User.findOne({ email, account_verification_status: 'verified' }); 
+        const user = await User.findOne({ email, account_verification_status: 'verified' });
 
         if (!user) {
             return res.status(400).json({ message: "Usuário não encontrado." }); // Retorna erro se o usuário não for encontrado
@@ -31,25 +31,30 @@ const forgotPassword = async (req, res) => {
         const verificationCode = crypto.randomInt(100000, 999999).toString();
         const codeExpires = Date.now() + 15 * 60 * 1000; // 15 minutos
 
-        user.reset_password_code = verificationCode; 
+        user.reset_password_code = verificationCode;
         user.reset_password_expires = codeExpires
         user.reset_password_attempts += 1
 
-        await user.save(); 
+        await user.save();
 
-        // Aqui você pode adicionar o envio do e-mail com o token
+        const appEnv = process.env?.NODE_ENV || 'dev'
 
-        /* 
-        const title = "Redefinição de senha";
-        const message = "Clique no link abaixo para redefinir sua senha na 1kole:";
-        const resetLink = `${process.env.CLIENT_URL}reset_password?token=${token}`;
-
-        await sendMail(user.email, "reset_password", title, { resetLink: resetLink, title, message });
-        */
+        if (appEnv === 'prod') {
+            /*
+          // 6. Envia e-mail com código
+          await sendVerificationEmail({
+            to: user.email,
+            name: user.name,
+            code: verificationCode
+          }); 
+          */
+        } else {
+            console.log("OTP de recuperar senha:", verificationCode)
+        }
 
         return res.status(200).json({ message: "Um link de redefinição de senha foi enviado para o seu e-mail." }); // Retorna sucesso
     } catch (error) {
-        console.log("Erro ao recuperar a senha: "+error.message)
+        console.log("Erro ao recuperar a senha: " + error.message)
         return res.status(500).json({ message: "Erro ao recuperar a senha" });
     }
 };
