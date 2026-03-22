@@ -1,9 +1,5 @@
 // controllers/auth/verifyEmail.js
 const User = require("../../../models/User");
-const generateAccessToken = require("../../../utils/generate-access-token");
-const generateRefreshToken = require("../../../utils/generate-refresh-token");
-const encryptRefreshToken = require("../../../utils/encrypt-refresh-token");
-const Session = require("../../../models/Session");
 const moment = require("moment");
 
 const verifyEmail = async (req, res) => {
@@ -11,7 +7,6 @@ const verifyEmail = async (req, res) => {
     const { email, code } = req.body;
 
     const user = await User.findOne({ email })
-      .select("username name is_verified account_verification_status coin_balance total_rewards_earned total_coins_converted last_seen is_online followers_count following_count blocked_users gender posts_count subscribers following player_id_onesignal location settings following_count followers followers_count bio email email_code email_code_expires email_code_attempts website cover_photo profile_image unread_notifications_count unread_messages_count");
 
     if (!user) return res.status(400).json({ message: "Usuario não encontrado" });
 
@@ -33,29 +28,9 @@ const verifyEmail = async (req, res) => {
 
     await user.save();
 
-    // Gera tokens
-    const accessToken = generateAccessToken(user, "30d");
-    const refreshToken = generateRefreshToken(user, "1y");
-    const encrypted = encryptRefreshToken(refreshToken);
+    // [TODO] Coloque um temporizador para verificar se em ate 1h ele nao completar o registro entao elimine a conta.
 
-    const session = new Session({
-      user: user._id,
-      token: encrypted.encrypted_refresh_token,
-      crypto: { key: encrypted.key, iv: encrypted.iv },
-      ip_address: req.ip,
-      user_agent: req.headers["user-agent"],
-      authentication_method: "email",
-      expires_at: moment().add(1, "year").toDate()
-    });
-
-    await session.save();
-
-    return res.status(200).json({
-      message: "Login realizado com sucesso",
-      access_token: accessToken,
-      session_id: session.id,
-      user
-    });
+    return res.status(200).json();
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: "Erro interno" });
