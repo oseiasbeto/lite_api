@@ -6,25 +6,32 @@ const User = require("../../../models/User.js");
 
 const createPost = async (req, res) => {
   try {
-    const { 
-      content, 
-      media, 
-      postTitle, 
-      privacy, 
-      isAnonymous, 
-      topics,
-      postType = 'question', 
-      sharedPost 
+    const {
+      content,
+      media,
+      postQuestion,
+      audience,
+      isAnonymous,
+      selectedTopics,
+      postType = 'question',
+      sharedPost
     } = req.body;
 
     const userId = req.user.id;
 
 
-    if (postType === 'question' && !postTitle)
+    if (postType === 'question' && !postQuestion)
       return res.status(400).json({
         success: false,
         message: "Informe a pergunta"
       })
+    else if (postQuestion.length > 300) {
+      return res.status(400).json({
+        success: false,
+        error: "O post não pode ter mais de 300 caracteres",
+      });
+    }
+
     // Validação manual
     if (!content.trim() && media.length === 0 && postType !== 'question') {
       return res.status(400).json({
@@ -33,10 +40,10 @@ const createPost = async (req, res) => {
       });
     }
 
-    if (content.length > 280) {
+    if (content.length > 4000) {
       return res.status(400).json({
         success: false,
-        error: "O post não pode ter mais de 280 caracteres",
+        error: "O post não pode ter mais de 4000 caracteres",
       });
     }
 
@@ -123,15 +130,15 @@ const createPost = async (req, res) => {
 
     // Criar o post
     const newPost = await Post.create({
-      content,
+      content: content,
       author: userId,
-      title: postTitle ? postTitle : '',
-      post_type: postType ? postType : 'question',
-      is_anonymous: isAnonymous ? isAnonymous : false,
-      topics: topics ? topics : [],
-      privacy: privacy,
+      question: postQuestion,
+      type: postType,
+      is_anonymous: isAnonymous,
+      topics: selectedTopics ? selectedTopics : [],
+      audience: audience,
       media: mediaDocs,
-      shared_post: sharedPost ?? undefined,
+      shared_post: sharedPost ? sharedPost : undefined,
     });
 
     if (newPost) {

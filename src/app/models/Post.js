@@ -2,23 +2,31 @@ const mongoose = require("mongoose");
 
 const post = new mongoose.Schema(
   {
-    post_type: {
+    type: {
       type: String,
       enum: ['question', 'post'],
       default: 'question',
       index: true
     },
 
-    title: {
+    question: {
       type: String,
       trim: true,
-      maxlength: 300
+      maxlength: 300,
+      required: [
+        function () {
+          return this.type === 'question';
+        },
+        "A pergunta e obrigatoria."
+      ]
     },
 
     content: {
       type: String,
-      maxlength: 280,
-      trim: true
+      trim: true,
+      default: function () {
+        return this.type === 'question' ? undefined : ""
+      }
     },
 
     author: {
@@ -49,7 +57,7 @@ const post = new mongoose.Schema(
 
     shares_count: {
       type: Number,
-      default: 0,
+      default: 0
     },
 
     upvotes: [
@@ -89,12 +97,11 @@ const post = new mongoose.Schema(
     shared_post: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
-      default: null
     },
 
     shares_count: {
       type: Number,
-      default: 0,
+      default: 0
     },
 
     is_anonymous: {
@@ -108,23 +115,33 @@ const post = new mongoose.Schema(
       default: 'active'
     },
 
-    privacy: {
+    audience: {
       type: String,
-      default: 'public'
+      enum: ['everyone', 'limited']
     },
-    
+
+    followers: {
+      type: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      }],
+      default: []
+    },
+
     mentions: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
-    media: [
-      {
+
+    media: {
+      type: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Media", // Referência à coleção Media
-      },
-    ],
+      }],
+      default: []
+    },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" }, // Adiciona timestamps automáticos.
@@ -132,9 +149,9 @@ const post = new mongoose.Schema(
 );
 
 // Índices para melhorar performance nas buscas
-post.index({ title: 'text', content: 'text', topics: 'text' });
-post.index({ post_type: 1, created_at: -1 });
-post.index({ author: 1, post_type: 1 });
+post.index({ question: 'text', content: 'text', topics: 'text' });
+post.index({ type: 1, created_at: -1 });
+post.index({ author: 1, type: 1 });
 post.index({ shared_post: 1, created_at: -1 })
 
 const Post = mongoose.model("Post", post);

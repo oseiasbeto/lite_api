@@ -11,11 +11,16 @@ const getPostsFeed = async (req, res) => {
     const page = parseInt(req.query.page) || 1; // Página atual (padrão: 1)
     const limit = parseInt(req.query.limit) || 10; // Limite por página (padrão: 10)
     const skip = (page - 1) * limit; // Quantidade de documentos a pular
-    const totalItems = parseInt(req.query.total) || 0; // Limite por página (padrão: 10)
-    const isLoad = (req.query.is_load && req.query.is_load === "true") || false;
+    const hasTotal = parseInt(req.query.total) || 0; // Limite por página (padrão: 10)
+
+    const filters = {
+      type: {
+        $ne: "question"
+      }
+    }
 
     // Busca notificações com paginação, ordenadas por created_at (descendente)
-    const posts = await Post.find()
+    const posts = await Post.find(filters)
       .sort({ created_at: -1 }) // Mais recentes primeiro
       .skip(skip)
       .limit(limit)
@@ -25,7 +30,7 @@ const getPostsFeed = async (req, res) => {
       })
       .populate(
         "author",
-        "name verified is_online profile_image"
+        "name verified is_online followers profile_image"
       ) // Popula username e profile_picture
       .populate({
         path: "shared_post",
@@ -33,7 +38,7 @@ const getPostsFeed = async (req, res) => {
           {
             path: "author",
             select:
-              "name verified is_online profile_image",
+              "name verified is_online followers profile_image",
           },
           {
             path: "media",
@@ -46,10 +51,10 @@ const getPostsFeed = async (req, res) => {
     // Conta o total de notificações para calcular totalPages
     let total;
 
-    if (!isLoad) {
-      total = await Post.countDocuments();
+    if (!hasTotal) {
+      total = await Post.countDocuments(filters);
     } else {
-      total = totalItems;
+      total = hasTotal;
     }
     const totalPages = Math.ceil(total / limit);
 
