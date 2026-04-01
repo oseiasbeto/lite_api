@@ -10,8 +10,9 @@ const createComment = async (req, res) => {
         const userId = req.user.id;
         const postId = req.params.id || null;
 
-        const { content, media, parentId } = req.body;
+        const { content, replyTo, media, parentId } = req.body;
 
+        console.log(replyTo)
         if (!postId)
             return res.status({
                 message: "Por favor informe o id do post"
@@ -113,12 +114,10 @@ const createComment = async (req, res) => {
         const newComment = await Comment.create({
             content,
             author: userId,
-            ...(parentId && {
-                replied_user: parentComment.author
-            }),
             post: postId,
             media: mediaDocs,
-            parent: parentId ?? parentId
+            parent: parentId,
+            reply_to: replyTo
         });
 
         if (newComment) {
@@ -130,7 +129,7 @@ const createComment = async (req, res) => {
 
             if (!parentId) {
                 await post.updateOne({
-                    $inc: { comment_count: 1 },
+                    $inc: { comments_count: 1 },
                 });
             } else {
                 if (parentComment) {
@@ -146,12 +145,19 @@ const createComment = async (req, res) => {
             const populatedComment = await Comment.findById(newComment._id)
                 .populate(
                     "author",
-                    "name verified is_online profile_image"
+                    "name username verified is_online profile_image"
                 )
-                .populate(
-                    "replied_user",
-                    "name verified is_online profile_image"
-                )
+                .populate({
+                    path: 'parent',
+                    populate: {
+                        path: 'author',
+                        select: 'name username verified is_online profile_image'
+                    }
+                })
+                .populate({
+                    path: 'reply_to',
+                    select: 'name username verified is_online profile_image'
+                })
                 .populate({
                     path: "media",
                     select: "url type thumbnail format width height duration",
@@ -308,7 +314,10 @@ const createComment = async (req, res) => {
 
             // Retornar resposta
             res.status(201).json({
-                new_comment: populatedComment,
+                new_comment: {
+                    ...populatedComment,
+                    replies: []
+                },
                 message: "Comentario criado com sucesso.",
             });
         }

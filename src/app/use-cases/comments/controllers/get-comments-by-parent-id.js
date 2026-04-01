@@ -1,5 +1,5 @@
-const Comment = require("../../models/Comment");
-const User = require("../../models/User");
+const Comment = require("../../../models/Comment");
+const User = require("../../../models/User");
 
 const getCommentsByParentId = async (req, res) => {
   try {
@@ -9,7 +9,6 @@ const getCommentsByParentId = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10; // Limite por página (padrão: 10)
     const skip = (page - 1) * limit; // Quantidade de documentos a pular
     const totalItems = parseInt(req.query.total) || 0; // Limite por página (padrão: 10)
-    const isLoad = (req.query.is_load && req.query.is_load === "true") || false;
 
     // Buscar informações do usuário logado para excluir posts próprios e bloqueados
     const currentUser = await User.findById(userId)
@@ -33,11 +32,11 @@ const getCommentsByParentId = async (req, res) => {
       })
       .populate(
         "author",
-        "name verified is_online profile_image"
+        "name username verified is_online profile_image"
       )
       .populate(
-        "replied_user",
-        "name verified is_online profile_image"
+        "reply_to",
+        "name username verified is_online profile_image"
       )
       .populate({
         path: "parent",
@@ -45,7 +44,7 @@ const getCommentsByParentId = async (req, res) => {
           {
             path: "author",
             select:
-              "name verified is_online profile_image",
+              "name username verified is_online profile_image",
           },
           {
             path: "media",
@@ -58,7 +57,7 @@ const getCommentsByParentId = async (req, res) => {
     // Conta o total de notificações para calcular totalPages
     let totalComments;
 
-    if (!isLoad) {
+    if (!totalItems) {
       totalComments = await Comment.countDocuments({
         parent: parentId
       });
@@ -70,10 +69,12 @@ const getCommentsByParentId = async (req, res) => {
     // Formata a resposta
     res.status(200).json({
       comments,
-      page,
-      totalPages,
-      total: totalComments,
-      hasMore: page < totalPages, // Indica se há mais páginas
+      pagination: {
+        page,
+        totalPages,
+        totalComments: totalComments,
+        hasMore: page < totalPages, // Indica se há mais páginas
+      }
     });
   } catch (err) {
     console.error("Erro ao buscar as respostas:", err);

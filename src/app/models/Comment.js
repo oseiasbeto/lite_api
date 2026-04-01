@@ -33,6 +33,11 @@ const comment = new mongoose.Schema(
       index: true
     },
 
+    reply_to: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    
     is_anonymous: {
       type: Boolean,
       default: false
@@ -72,12 +77,6 @@ const comment = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-
-    replied_user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User"
-    },
-
     mentions: [
       {
         type: mongoose.Schema.Types.ObjectId,
