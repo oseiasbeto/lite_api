@@ -1,6 +1,7 @@
 // controllers/messageController.js
 const Message = require('../../../models/Message');
 const Conversation = require('../../../models/Conversation')
+const User = require('../../../models/User')
 const { emitToUser } = require("../../../services/socket");
 const sendPushNotification = require("../../../services/send-push-notification");
 
@@ -133,7 +134,7 @@ const sendMessage = async (req, res) => {
       reply_to: originalMessageReplyTo ? originalMessageReplyTo : null
     };
 
-    conversation.participants.forEach(participant => {
+    conversation.participants.forEach(async participant => {
       if (participant?.user?._id.toString() === senderId.toString()) return;
 
       const current = conversation.unread_count.get(participant?.user?._id.toString()) || 0;
@@ -141,6 +142,15 @@ const sendMessage = async (req, res) => {
 
       if (participant?.user?.is_online) {
         emitToUser(participant?.user?._id.toString(), 'new_message', messageToSend)
+        await User.updateOne({
+          _id: participant?.user?._id
+        }, {
+          $inc: {
+            unread_messages_count: 1
+          }
+        })
+      } else {
+        // [TODO] Enviar push notification
       }
     });
 
@@ -150,8 +160,6 @@ const sendMessage = async (req, res) => {
 
     await conversation.save();
 
-
-    console.log(senderId)
     return res.status(201).json({
       message: "Mensagem enviada com sucesso",
       data: {
