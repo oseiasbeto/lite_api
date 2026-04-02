@@ -16,7 +16,7 @@ const getCommentsByPostId = async (req, res) => {
                 sort = { created_at: -1 };
                 break;
             case 'relevants':
-                sort = { upvotes_count: -1 };
+                sort = { created_at: -1 };
                 break
         }
 

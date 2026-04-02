@@ -148,6 +148,10 @@ const createPost = async (req, res) => {
         { $set: { target: newPost._id } }
       );
 
+      await Post.findByIdAndUpdate(sharedPost, {
+        $inc: { shares_count: 1 },
+      });
+
       // Popular os dados para retornar
       const populatedPost = await Post.findById(newPost._id)
         .populate(
@@ -169,10 +173,7 @@ const createPost = async (req, res) => {
 
       // Se for reply, atualizar o post original e criar notificação
       if (false && sharedPostDoc && populatedPost) {
-        await Post.findByIdAndUpdate(originalPost, {
-          $push: { replies: newPost._id },
-          $inc: { replies_count: 1 },
-        });
+
 
         if (sharedPostDoc.author?._id.toString() !== userId.toString()) {
           // Lógica de notificação para o reply

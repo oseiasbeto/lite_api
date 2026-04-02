@@ -8,7 +8,6 @@ const getUsersByQuery = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10; // Itens por página (padrão: 10)
     const skip = (page - 1) * limit;
     const totalItems = parseInt(req.query.total) || 0; // Total de itens para otimização
-    const isLoad = req?.query.is_load === "true" || false; // Indicador de carregamento incremental
     const userId = req?.user?.id; // ID do usuário autenticado (para filtrar bloqueados)
 
     // Construir o filtro de busca
@@ -20,9 +19,9 @@ const getUsersByQuery = async (req, res) => {
             { "privacy_settings.profile_visibility": "public" },
             userId
               ? {
-                  "privacy_settings.profile_visibility": "followers",
-                  followers: userId,
-                }
+                "privacy_settings.profile_visibility": "followers",
+                followers: userId,
+              }
               : { _id: null }, // Exclui friends_only se não autenticado
           ],
         },
@@ -44,7 +43,7 @@ const getUsersByQuery = async (req, res) => {
     // Buscar usuários
     const users = await User.find(filter)
       .select(
-        "username name verified activity_status blocked_users gender posts_count subscribers following following_count followers followers_count bio email website cover_photo profile_image"
+        "-password"
       )
       .sort({
         verified: -1, // Usuários verificados aparecem primeiro
@@ -59,7 +58,7 @@ const getUsersByQuery = async (req, res) => {
     let total;
 
     // Se não for carregamento incremental, contar total de usuários
-    if (!isLoad) {
+    if (!totalItems) {
       total = await User.countDocuments(filter);
     } else {
       total = totalItems;
@@ -70,10 +69,12 @@ const getUsersByQuery = async (req, res) => {
     // Retornar resposta
     res.status(200).json({
       users,
-      page,
-      totalPages,
-      total,
-      hasMore: page < totalPages,
+      pagination: {
+        page,
+        totalPages,
+        total,
+        hasMore: page < totalPages,
+      }
     });
   } catch (err) {
     console.error("Erro ao buscar usuários:", err);

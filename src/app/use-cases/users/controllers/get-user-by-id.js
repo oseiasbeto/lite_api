@@ -13,8 +13,8 @@ const getUserById = async (req, res) => {
       return res.status(400).json({ message: "O id e obrigatorio." });
     }
 
-    const user = await User.findOne({ _id: id }).select(
-      "username name verified activity_status blocked_users gender posts_count subscribers following following_count followers followers_count bio email website cover_photo profile_image"
+    const user = await User.findOne({ _id: id, is_deleted: false }).select(
+      "-password -muted_conversations -socket_id -player_id_onesignal -is_deleted"
     );
 
     if (!user) {
