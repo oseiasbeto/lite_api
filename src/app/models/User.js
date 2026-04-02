@@ -83,11 +83,11 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     }],
-    subscriptions: [{
+    following: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     }],
-    following: [{
+    subscriptions: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     }],
@@ -142,6 +142,7 @@ const userSchema = new mongoose.Schema(
     posts_count: { type: Number, default: 0 },
     followers_count: { type: Number, default: 0 },
     following_count: { type: Number, default: 0 },
+    subscriptions_count: { type: Number, default: 0 },
 
     // === AUTENTICAÇÃO ===
     google_id: String,
@@ -180,7 +181,7 @@ const userSchema = new mongoose.Schema(
           default: "everybody"
         },
         profile_visibility: { type: String, enum: ["everybody", "followers", "nobody"], default: "everybody" },
-        message_privacy: { type: String, enum: ["everybody", "followers", "nobody"], default: "nobody" },
+        message: { type: String, enum: ["everybody", "followers", "nobody"], default: "everybody" },
       }
     },
 
