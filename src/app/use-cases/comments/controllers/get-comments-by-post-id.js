@@ -37,14 +37,56 @@ const getCommentsByPostId = async (req, res) => {
             {
                 $lookup: {
                     from: 'comments',
-                    localField: '_id',
-                    foreignField: 'parent',
+                    let: { commentId: '$_id' },
+                    pipeline: [
+                        { 
+                            $match: { 
+                                $expr: { $eq: ['$parent', '$$commentId'] } 
+                            } 
+                        },
+                        { $limit: 3 },
+                        {
+                            $lookup: {
+                                from: 'users',
+                                localField: 'author',
+                                foreignField: '_id',
+                                as: 'author'
+                            }
+                        },
+                        {
+                            $unwind: {
+                                path: '$author',
+                                preserveNullAndEmptyArrays: true  // Importante: mantém a reply mesmo sem author
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                content: 1,
+                                parent: 1,
+                                upvotes: 1,
+                                upvotes_count: 1,
+                                downvotes: 1,
+                                downvotes_count: 1,
+                                replies_count: 1,
+                                created_at: 1,
+                                reply_to: 1,
+                                author: {
+                                    $cond: {
+                                        if: { $ifNull: ['$author', false] },
+                                        then: {
+                                            _id: '$author._id',
+                                            name: '$author.name',
+                                            username: '$author.username',
+                                            profile_image: '$author.profile_image'
+                                        },
+                                        else: null  // Retorna null se não tiver author
+                                    }
+                                }
+                            }
+                        }
+                    ],
                     as: 'replies'
-                }
-            },
-            {
-                $addFields: {
-                    replies: { $slice: ['$replies', 3] }
                 }
             },
             {
@@ -56,7 +98,10 @@ const getCommentsByPostId = async (req, res) => {
                 }
             },
             {
-                $unwind: '$author'
+                $unwind: {
+                    path: '$author',
+                    preserveNullAndEmptyArrays: true
+                }
             },
             {
                 $project: {
@@ -69,13 +114,19 @@ const getCommentsByPostId = async (req, res) => {
                     downvotes_count: 1,
                     replies_count: 1,
                     created_at: 1,
-                    author: {
-                        _id: 1,
-                        name: 1,
-                        username: 1,
-                        profile_image: 1
-                    },
                     reply_to: 1,
+                    author: {
+                        $cond: {
+                            if: { $ifNull: ['$author', false] },
+                            then: {
+                                _id: '$author._id',
+                                name: '$author.name',
+                                username: '$author.username',
+                                profile_image: '$author.profile_image'
+                            },
+                            else: null
+                        }
+                    },
                     replies: {
                         $map: {
                             input: '$replies',
@@ -92,8 +143,20 @@ const getCommentsByPostId = async (req, res) => {
                                 replies_count: '$$reply.replies_count',
                                 created_at: '$$reply.created_at',
                                 reply_to: '$$reply.reply_to',
-                                author: '$$reply.author',
+                                author: '$$reply.author'  // Já vem tratado do pipeline do lookup
                             }
+                        }
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    // Filtra replies que tem author null se quiser (opcional)
+                    replies: {
+                        $filter: {
+                            input: '$replies',
+                            as: 'reply',
+                            cond: { $ne: ['$$reply.author', null] }
                         }
                     }
                 }
@@ -130,7 +193,6 @@ const getCommentsByPostId = async (req, res) => {
             }
         });
     } catch (error) {
-
         console.error(error)
         res.status(500).json({ message: 'Erro ao carregar comentários' });
     }
