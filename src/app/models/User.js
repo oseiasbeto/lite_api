@@ -40,10 +40,33 @@ const userSchema = new mongoose.Schema(
 
     // === PERFIL VISUAL ===
     profile_image: {
-      public_id: { type: String, default: null },
+      public_id: {
+        type: String,
+        default: null
+      },
       url: {
         type: String,
         default: "https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png"
+      },
+      thumbnails: {
+        // URLs normais (SEM círculo) - para uso geral na UI
+        xs: { type: String, default: null },  // 50x50
+        sm: { type: String, default: null },  // 100x100
+        md: { type: String, default: null },  // 200x200
+        lg: { type: String, default: null },  // 400x400
+        xl: { type: String, default: null },  // 800x800
+
+        // URLs específicas para push notification (COM círculo e fundo transparente)
+        push_notification: { type: String, default: null },       // 192x192 circular
+        push_notification_small: { type: String, default: null }, // 96x96 circular
+        push_notification_large: { type: String, default: null }, // 512x512 circular
+        push_notification_ios: { type: String, default: null },   // 256x256 circular
+        push_notification_android: { type: String, default: null } // 192x192 circular
+      },
+      metadata: {
+        original_url: { type: String, default: null },
+        format: { type: String, default: null },
+        uploaded_at: { type: Date, default: Date.now }
       }
     },
 
@@ -51,7 +74,7 @@ const userSchema = new mongoose.Schema(
     bio: {
       type: String,
       maxlength: [160, "Bio máxima de 160 caracteres"],
-      default: ""
+      default: "",
     },
     birth_date: {
       type: Date,
@@ -66,11 +89,8 @@ const userSchema = new mongoose.Schema(
       enum: ["male", "female", "other", "prefer_not_to_say"],
       default: "prefer_not_to_say",
     },
-    location: {
-      city: { type: String, default: "" },
-      state: { type: String, default: "" },
-      country: { type: String, default: "" },
-    },
+    location: String,
+    credentials: String,
     interests: [{
       type: String,
     }],
@@ -172,7 +192,7 @@ const userSchema = new mongoose.Schema(
       },
       language: {
         type: String,
-        default: "pt-BR"
+        default: "pt-AO"
       },
       privacy: {
         last_seen: {

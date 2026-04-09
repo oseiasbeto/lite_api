@@ -2,8 +2,8 @@ const Comment = require("../../../models/Comment.js");
 const Post = require("../../../models/Post.js");
 const Media = require("../../../models/Media.js");
 const User = require("../../../models/User.js");
-//const Notification = require("../../../models/Notification");
-//const { getIO } = require("../../../services/socket");
+const Notification = require("../../../models/Notification");
+const { getIO } = require("../../../services/socket");
 
 const createComment = async (req, res) => {
     try {
@@ -12,7 +12,6 @@ const createComment = async (req, res) => {
 
         const { content, replyTo, media, parentId } = req.body;
 
-        console.log(replyTo)
         if (!postId)
             return res.status({
                 message: "Por favor informe o id do post"
@@ -38,6 +37,7 @@ const createComment = async (req, res) => {
         }
 
         const post = await Post.findById(postId)
+            .populate("author", 'name socket_id is_online profile_image')
 
         if (!post) return res.status(400).send({
             message: "Nao foi possivel achar um post com este id"
@@ -47,6 +47,7 @@ const createComment = async (req, res) => {
         let parentComment = null;
         if (parentId) {
             parentComment = await Comment.findById(parentId)
+                .populate("author", 'name socket_id is_online profile_image')
 
             if (!parentComment) {
                 return res.status(404).json({
@@ -58,9 +59,7 @@ const createComment = async (req, res) => {
 
         // Verificar se o autor do comentario original existe (para replies)
         if (parentId && parentComment) {
-            const author = await User.findById(parentComment?.author).select(
-                "username is_online unread_notifications_count"
-            );
+            const author = await User.findById(parentComment?.author)
             if (!author) {
                 return res.status(400).json({
                     success: false,
@@ -71,7 +70,7 @@ const createComment = async (req, res) => {
 
         const mediaDocs = [];
         for (const mediaItem of media) {
-    
+
             if (!mediaItem.public_id || !mediaItem.url || !mediaItem.type) {
                 return res.status(400).json({
                     success: false,
@@ -138,7 +137,7 @@ const createComment = async (req, res) => {
                             replies_count: 1
                         }
                     })
-                } 
+                }
             }
 
             // Popular os dados para retornar
@@ -165,150 +164,141 @@ const createComment = async (req, res) => {
                 .lean();
 
 
-            if (false) {
-                await post.updateOne(originalPost, {
-                    $push: { replies: newPost._id },
-                    $inc: { replies_count: 1 },
+            // Lógica de notificação para o reply
+            const notificationType = parentComment?._id ? "reply_to_comment" : "new_comment";
+            const timeThreshold = new Date(Date.now() - 60 * 60 * 1000); // 1 hora
+            const io = getIO();
+
+            const message = parentComment?._id
+                ? "respondeu à sua resposta."
+                : "comentou ao seu post.";
+
+            // Verifica se o autor está ativo
+
+            const author = parentComment?._id ? parentComment?.author : post?.author;
+
+            if (author?.is_online) {
+                const newNotification = new Notification({
+                    recipient: author._id,
+                    sender: userId,
+                    type: notificationType,
+                    post: post._id,
+                    comment: newComment?._id,
+                    message
                 });
 
-                if (originalPostDoc.author?._id.toString() !== userId.toString()) {
-                    // Lógica de notificação para o reply
-                    const notificationType = "reply";
-                    const timeThreshold = new Date(Date.now() - 60 * 60 * 1000); // 1 hora
-                    const io = getIO();
+                await newNotification.save()
 
-                    // Determinar a mensagem com base no tipo de reply
-                    const isNestedReply = originalPostDoc.is_reply; // Verifica se o originalPostDoc é uma resposta
-                    const message = isNestedReply
-                        ? "respondeu à sua resposta."
-                        : "respondeu ao seu post.";
+                const populatedNotification = await Notification.findOne({
+                    _id: newNotification?._id
+                })
+                    .populate("recipient", "name username verified is_online profile_image")
+                    .populate("sender", "name username verified is_online profile_image")
+                    .populate({
+                        path: "post",
+                        populate: [
+                            {
+                                path: "author", 
+                                select: "name username verified is_online profile_image",
+                            },
+                            {
+                                path: "media",
+                                select: "url _id type format thumbnail duration post",
+                            },
+                            {
+                                path: "shared_post",
+                                populate: [
+                                    {
+                                        path: "author",
+                                        select: "name username verified is_online profile_image",
+                                    },
+                                    {
+                                        path: "media",
+                                        select: "url _id type format thumbnail duration post",
+                                    },
+                                ],
+                            },
+                        ],
+                    })
+                    .populate({
+                        path: "comment",
+                        populate: {
+                            path: "author",
+                            select: "name username verified is_online profile_image"
+                        }
+                    })
 
-                    // Verifica se o autor está ativo
-                    const isAuthorActive =
-                        originalPostDoc.author.is_online.is_active &&
-                        originalPostDoc.author.is_online.socket_id &&
-                        typeof originalPostDoc.author.is_online.socket_id ===
-                        "string";
+                // Incrementa contador de notificações não lidas
+                await User.findByIdAndUpdate(author?._id, {
+                    $inc: { unread_notifications_count: 1 },
+                });
+                io.to(author.socket_id).emit("new_notification", populatedNotification);
+                console.log("Emitindo nova notificacao para socket:", author?.socket_id);
+            } else if (false) {
+                // Se o autor está inativo, tenta agrupar notificações
+                let existingNotification = await Notification.findOne({
+                    recipient: originalPostDoc.author._id,
+                    type: notificationType,
+                    target: originalPostDoc._id,
+                    created_at: { $gte: timeThreshold },
+                }).populate({
+                    path: "target",
+                    select: "content text author created_at",
+                    populate: {
+                        path: "author",
+                        select: "username profile_image name",
+                    },
+                });
 
-                    if (isAuthorActive) {
-                        // Se o autor está ativo, cria uma notificação individual para cada reply
-                        const notification = new Notification({
-                            recipient: originalPostDoc.author._id,
-                            senders: [userId],
-                            type: notificationType,
-                            target: populatedPost._id,
-                            module: postModule,
-                            target_model: "Post",
-                            message,
-                            read: false,
-                        });
-                        await notification.save();
+                if (existingNotification) {
+                    // Agrupa notificações de replies para o mesmo post/resposta
+                    let updatedSenders = [...existingNotification.senders];
+                    let isNewSender = !updatedSenders.find(
+                        (sender) => sender._id.toString() === userId.toString()
+                    );
 
-                        // Busca detalhes do remetente
-                        const senderDetails = await User.find(
-                            { _id: { $in: [userId] } },
-                            "username name profile_image verified"
-                        ).lean();
+                    if (isNewSender) {
+                        updatedSenders.push(userId);
+                    }
 
-                        // Incrementa contador de notificações não lidas
+                    const totalSenders = updatedSenders.length;
+                    const groupedMessage =
+                        totalSenders === 1
+                            ? message
+                            : isNestedReply
+                                ? "responderam à sua resposta."
+                                : "responderam ao seu post.";
+
+                    // Atualiza a notificação existente
+                    await existingNotification.updateOne({
+                        $set: { message: groupedMessage, read: false },
+                        $addToSet: { senders: userId }, // Usa $addToSet para evitar duplicatas no array
+                    });
+
+                    // Incrementa contador de notificações não lidas apenas se for um novo remetente
+                    if (isNewSender) {
                         await User.findByIdAndUpdate(originalPostDoc.author._id, {
                             $inc: { unread_notifications_count: 1 },
                         });
-
-                        // Emite notificação em tempo real
-                        console.log(
-                            "Emitindo newNotification para socket:",
-                            originalPostDoc.author.is_online.socket_id
-                        );
-                        io.to(originalPostDoc.author.is_online.socket_id).emit(
-                            "newNotification",
-                            {
-                                _id: notification._id,
-                                type: notificationType,
-                                message,
-                                module: notification.module,
-                                created_at: notification.created_at,
-                                updated_at: Date.now(),
-                                target: populatedPost,
-                                target_model: "Post",
-                                senders: senderDetails,
-                            }
-                        );
-                    } else {
-                        // Se o autor está inativo, tenta agrupar notificações
-                        let existingNotification = await Notification.findOne({
-                            recipient: originalPostDoc.author._id,
-                            type: notificationType,
-                            target: originalPostDoc._id,
-                            created_at: { $gte: timeThreshold },
-                        }).populate({
-                            path: "target",
-                            select: "content text author created_at",
-                            populate: {
-                                path: "author",
-                                select: "username profile_image name",
-                            },
-                        });
-
-                        if (existingNotification) {
-                            // Agrupa notificações de replies para o mesmo post/resposta
-                            let updatedSenders = [...existingNotification.senders];
-                            let isNewSender = !updatedSenders.find(
-                                (sender) => sender._id.toString() === userId.toString()
-                            );
-
-                            if (isNewSender) {
-                                updatedSenders.push(userId);
-                            }
-
-                            const totalSenders = updatedSenders.length;
-                            const groupedMessage =
-                                totalSenders === 1
-                                    ? message
-                                    : isNestedReply
-                                        ? "responderam à sua resposta."
-                                        : "responderam ao seu post.";
-
-                            // Atualiza a notificação existente
-                            await existingNotification.updateOne({
-                                $set: { message: groupedMessage, read: false },
-                                $addToSet: { senders: userId }, // Usa $addToSet para evitar duplicatas no array
-                            });
-
-                            // Incrementa contador de notificações não lidas apenas se for um novo remetente
-                            if (isNewSender) {
-                                await User.findByIdAndUpdate(originalPostDoc.author._id, {
-                                    $inc: { unread_notifications_count: 1 },
-                                });
-                            }
-                        } else {
-                            // Cria uma nova notificação para o reply (usuário inativo)
-                            const notification = new Notification({
-                                recipient: originalPostDoc.author._id,
-                                senders: [userId],
-                                type: notificationType,
-                                target: originalPostDoc._id,
-                                module: postModule,
-                                target_model: "Post",
-                                message,
-                                read: false,
-                            });
-                            await notification.save();
-
-                            // Incrementa contador de notificações não lidas
-                            await User.findByIdAndUpdate(originalPostDoc.author._id, {
-                                $inc: { unread_notifications_count: 1 },
-                            });
-                        }
                     }
-                }
+                } else {
+                    // Cria uma nova notificação para o reply (usuário inativo)
+                    const notification = new Notification({
+                        recipient: originalPostDoc.author._id,
+                        senders: [userId],
+                        type: notificationType,
+                        target: originalPostDoc._id,
+                        module: postModule,
+                        target_model: "Post",
+                        message,
+                        read: false,
+                    });
+                    await notification.save();
 
-                // Atualizar contador de posts do usuário (apenas para posts não-replies)
-                if (!isReply) {
-                    await User.findOneAndUpdate(
-                        { _id: newPost.author },
-                        { $inc: { posts_count: 1 } }
-                    );
+                    // Incrementa contador de notificações não lidas
+                    await User.findByIdAndUpdate(originalPostDoc.author._id, {
+                        $inc: { unread_notifications_count: 1 },
+                    });
                 }
             }
 

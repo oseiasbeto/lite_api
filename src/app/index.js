@@ -22,6 +22,7 @@ app.use("/files", express.static(path.resolve(__dirname, "..", "uploads")))
 const auth = require("./use-cases/auth/auth.routes")
 const users = require("./use-cases/users/users.routes")
 const messages = require("./use-cases/messages/messages.routes")
+const notifications = require("./use-cases/notifications/notifications.routes")
 const conversations = require("./use-cases/conversations/conversations.routes")
 const posts = require("./use-cases/posts/posts.routes")
 const comments = require("./use-cases/comments/comments.routes")
@@ -32,6 +33,7 @@ app.use("/v1/auth", auth) // Rotas de autenticação
 app.use("/v1/users", users) // Rotas de usuários
 app.use("/v1/messages", messages) // Rotas de mensagens
 app.use("/v1/conversations", conversations) // Rotas de conversacao
+app.use("/v1/notifications", notifications)
 app.use("/v1/posts", posts) // Rotas de posts
 app.use("/v1/comments", comments) // Rotas de comentarios
 app.use("/v1/topics", topics) 

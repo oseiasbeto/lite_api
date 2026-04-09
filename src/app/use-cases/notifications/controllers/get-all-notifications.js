@@ -1,11 +1,5 @@
 const Notifications = require("../../../models/Notification");
 
-/**
- * Busca todas as notificações do usuário logado com paginação.
- * @param {Object} req - Requisição HTTP
- * @param {Object} res - Resposta HTTP
- */
-
 const getAllNotifications = async (req, res) => {
   try {
     const userId = req.user.id; // ID do usuário logado
@@ -13,7 +7,6 @@ const getAllNotifications = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10; // Limite por página (padrão: 10)
     const skip = (page - 1) * limit; // Quantidade de documentos a pular
     const totalItems = parseInt(req.query.total) || 0; // Limite por página (padrão: 10)
-    const isLoad = (req.query.is_load && req.query.is_load === "true") || false;
 
     // Busca notificações com paginação, ordenadas por created_at (descendente)
     const notifications = await Notifications.find({
@@ -23,28 +16,30 @@ const getAllNotifications = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .populate(
-        "senders",
-        "username name verified activity_status blocked_users gender posts_count subscribers following following_count followers followers_count bio email website cover_photo profile_image"
-      ) // Popula username e profile_picture
+        "sender",
+        "name username verified is_online profile_image"
+      ) 
+      .populate(
+        "recipient",
+        "name username verified is_online profile_image"
+      ) 
       .populate({
-        path: "target",
+        path: "post",
         populate: [
           {
-            path: "follower author following", // Popula follower e followed dentro de Relationship
-            select:
-              "username name verified activity_status blocked_users gender posts_count subscribers following following_count followers followers_count bio email website cover_photo profile_image",
+            path: "author", // Popula follower e followed dentro de Relationship
+            select: "name username verified is_online profile_image",
           },
           {
             path: "media",
             select: "url _id type format thumbnail duration post",
           },
           {
-            path: "original_post",
+            path: "shared_post",
             populate: [
               {
                 path: "author",
-                select:
-                  "username name verified activity_status blocked_users gender posts_count subscribers following following_count followers followers_count bio email website cover_photo profile_image",
+                select: "name username verified is_online profile_image",
               },
               {
                 path: "media",
@@ -54,14 +49,21 @@ const getAllNotifications = async (req, res) => {
           },
         ],
       })
+      .populate({
+        path: "comment",
+        populate: {
+          path: "author",
+          select: "name username verified is_online profile_image"
+        }
+      })
       .lean(); // Converte para objeto JavaScript puro
 
     // Conta o total de notificações para calcular totalPages
     let total;
 
-    if (!isLoad) {
+    if (!totalItems) {
       total = await Notifications.countDocuments({
-        recipient: userId,
+        recipient: userId
       });
     } else {
       total = totalItems;
@@ -71,10 +73,12 @@ const getAllNotifications = async (req, res) => {
     // Formata a resposta
     res.status(200).json({
       notifications,
-      page,
-      totalPages,
-      total,
-      hasMore: page < totalPages, // Indica se há mais páginas
+      pagination: {
+        page,
+        totalPages,
+        total,
+        hasMore: page < totalPages, // Indica se há mais páginas
+      }
     });
   } catch (err) {
     console.error("Erro ao notificacoes postagem:", err);

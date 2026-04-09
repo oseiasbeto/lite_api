@@ -13,7 +13,7 @@ const getPostById = async (req, res) => {
     const post = await Post.findOne({ _id: id })
       .populate(
         "author",
-        "name verified is_online profile_image"
+        "name verified is_online profile_image credentials location"
       ) // Popula username e profile_picture
       .populate({
         path: "shared_post",
@@ -21,7 +21,7 @@ const getPostById = async (req, res) => {
           {
             path: "author",
             select:
-              "name verified is_online profile_image",
+              "name verified is_online profile_image credentials location",
           },
           {
             path: "media",
