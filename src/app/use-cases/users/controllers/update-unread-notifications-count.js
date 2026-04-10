@@ -2,7 +2,7 @@
 const User = require("../../../models/User");
 
 
-const updateUnreadMessagesCount = async (req, res) => {
+const updateUnreadNotificationsCount = async (req, res) => {
     try {
         const { id } = req.user;
         const { count } = req.body
@@ -15,7 +15,7 @@ const updateUnreadMessagesCount = async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "Usuario nao encontrado" });
         } else {           
-            user.unread_messages_count = count
+            user.unread_notifications_count = count
             await user.save()
 
             return res.status(200).json({
@@ -31,4 +31,4 @@ const updateUnreadMessagesCount = async (req, res) => {
 };
 
 // Exporta a função para que possa ser usada em outras partes do projeto
-module.exports = updateUnreadMessagesCount;
+module.exports = updateUnreadNotificationsCount;

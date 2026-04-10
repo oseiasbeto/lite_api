@@ -76,7 +76,7 @@ const getAllNotifications = async (req, res) => {
       pagination: {
         page,
         totalPages,
-        total,
+        totalDocuments: total,
         hasMore: page < totalPages, // Indica se há mais páginas
       }
     });

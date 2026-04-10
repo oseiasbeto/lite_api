@@ -19,15 +19,13 @@ const extractFullPathAfterUpload = (url) => {
 const extractFullPublicId = (url) => {
     const fullPath = extractFullPathAfterUpload(url);
     if (!fullPath) return null;
-    
-    // Remove transformações se existirem
-    const parts = fullPath.split('/');
-    // Se a última parte contém extensão, pode ser o arquivo
-    const lastPart = parts[parts.length - 1];
-    if (lastPart.includes('.')) {
-        return lastPart.replace(/\.[^/.]+$/, '');
-    }
-    return fullPath.replace(/\.[^/.]+$/, '');
+
+    // Remove transformações: padrão: letras_numeros (possivelmente com vírgulas) até encontrar /
+    // Exemplo: "f_auto,q_80,w_500,c_fill/" deve ser removido
+    const cleanPath = fullPath.replace(/^[a-z]+(?:_[0-9a-z]+)?(?:,[a-z]+_[0-9a-z]+)*\//, '');
+
+    // Remove extensão do arquivo
+    return cleanPath.replace(/\.[^/.]+$/, '');
 };
 
 /**
@@ -36,7 +34,7 @@ const extractFullPublicId = (url) => {
 const getNormalUrl = (originalUrl, width, height) => {
     const fullPath = extractFullPathAfterUpload(originalUrl);
     if (!fullPath) return originalUrl;
-    
+
     const baseUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload`;
     return `${baseUrl}/c_fill,w_${width},h_${height},q_auto,f_auto/${fullPath}`;
 };
@@ -47,7 +45,7 @@ const getNormalUrl = (originalUrl, width, height) => {
 const getPushNotificationUrl = (originalUrl, size) => {
     const fullPath = extractFullPathAfterUpload(originalUrl);
     if (!fullPath) return originalUrl;
-    
+
     const baseUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload`;
     return `${baseUrl}/c_fill,g_auto,w_${size},h_${size},r_max,f_png,b_transparent/${fullPath}`;
 };
@@ -57,7 +55,7 @@ const getPushNotificationUrl = (originalUrl, size) => {
  */
 const generateThumbnails = (originalUrl) => {
     if (!originalUrl) return null;
-    
+
     return {
         // URLs normais (SEM círculo)
         xs: getNormalUrl(originalUrl, 50, 50),
@@ -65,7 +63,7 @@ const generateThumbnails = (originalUrl) => {
         md: getNormalUrl(originalUrl, 200, 200),
         lg: getNormalUrl(originalUrl, 400, 400),
         xl: getNormalUrl(originalUrl, 800, 800),
-        
+
         // URLs para push notification (COM círculo)
         push_notification: getPushNotificationUrl(originalUrl, 250),
         push_notification_small: getPushNotificationUrl(originalUrl, 96),
@@ -84,7 +82,7 @@ const updateUserById = async (req, res) => {
             return res.status(400).json({ message: "O id é obrigatório." });
         }
 
-        const user = await User.findById(id).select("-password -googleId -facebookId -createdAt -updatedAt -__v");
+        const user = await User.findById(id).select("-password -googleId -socket_id -player_id_onesignal -facebookId -createdAt -updatedAt -__v");
 
         if (!user) {
             return res.status(404).json({ message: "Usuário não encontrado" });
@@ -113,14 +111,14 @@ const updateUserById = async (req, res) => {
             } else if (typeof picture === 'string' && picture.includes('cloudinary.com')) {
                 const thumbnails = generateThumbnails(picture);
                 const fullPublicId = extractFullPublicId(picture);
-                
+
                 user.profile_image = {
                     public_id: fullPublicId,
-                    url: thumbnails?.lg || picture,
+                    url: picture,
                     thumbnails: thumbnails,
-                    metadata: { 
-                        original_url: picture, 
-                        uploaded_at: new Date() 
+                    metadata: {
+                        original_url: picture,
+                        uploaded_at: new Date()
                     }
                 };
             }
@@ -132,7 +130,7 @@ const updateUserById = async (req, res) => {
             user: user.toObject(),
             message: "Usuário atualizado com sucesso.",
         });
-        
+
     } catch (err) {
         console.error("Erro ao atualizar o usuário:", err);
         return res.status(500).json({ message: "Erro interno no servidor" });

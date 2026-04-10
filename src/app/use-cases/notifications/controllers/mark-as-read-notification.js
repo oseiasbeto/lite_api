@@ -13,7 +13,7 @@ const markAsReadNotification = async (req, res) => {
     }
 
     // Marca a notificação como lida
-    notification.read = true;
+    notification.is_read = true;
 
     // Salva a notificação atualizada no banco de dados
     await notification.save();  

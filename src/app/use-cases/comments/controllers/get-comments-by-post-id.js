@@ -9,6 +9,7 @@ const getCommentsByPostId = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const hasTotal = parseInt(req.query.total) || 0;
         const sortBy = req.query.sortBy || 'recents';
+        const sortCommentId = req.query.sortCommentId || null; // ID do comentário prioritário
 
         let sort;
         switch (sortBy) {
@@ -30,7 +31,8 @@ const getCommentsByPostId = async (req, res) => {
 
         const match = { post: mongoose.Types.ObjectId(postId), parent: null }
 
-        const comments = await Comment.aggregate([
+        // Buscar comentários com agregação
+        let comments = await Comment.aggregate([
             {
                 $match: match
             },
@@ -56,7 +58,7 @@ const getCommentsByPostId = async (req, res) => {
                         {
                             $unwind: {
                                 path: '$author',
-                                preserveNullAndEmptyArrays: true  // Importante: mantém a reply mesmo sem author
+                                preserveNullAndEmptyArrays: true
                             }
                         },
                         {
@@ -80,7 +82,7 @@ const getCommentsByPostId = async (req, res) => {
                                             username: '$author.username',
                                             profile_image: '$author.profile_image'
                                         },
-                                        else: null  // Retorna null se não tiver author
+                                        else: null
                                     }
                                 }
                             }
@@ -143,7 +145,7 @@ const getCommentsByPostId = async (req, res) => {
                                 replies_count: '$$reply.replies_count',
                                 created_at: '$$reply.created_at',
                                 reply_to: '$$reply.reply_to',
-                                author: '$$reply.author'  // Já vem tratado do pipeline do lookup
+                                author: '$$reply.author'
                             }
                         }
                     }
@@ -151,7 +153,6 @@ const getCommentsByPostId = async (req, res) => {
             },
             {
                 $addFields: {
-                    // Filtra replies que tem author null se quiser (opcional)
                     replies: {
                         $filter: {
                             input: '$replies',
@@ -160,17 +161,51 @@ const getCommentsByPostId = async (req, res) => {
                         }
                     }
                 }
-            },
-            {
-                $sort: sort
-            },
-            {
-                $skip: (page - 1) * limit
-            },
-            {
-                $limit: limit
             }
         ]);
+
+        // 🔥 LÓGICA DE ORDENAÇÃO PRIORITÁRIA 🔥
+        if (sortCommentId && mongoose.Types.ObjectId.isValid(sortCommentId)) {
+            const targetCommentId = mongoose.Types.ObjectId(sortCommentId);
+            
+            // Encontra o comentário prioritário
+            const priorityComment = comments.find(
+                comment => comment._id.toString() === targetCommentId.toString()
+            );
+            
+            if (priorityComment) {
+                // Remove o comentário prioritário da lista
+                comments = comments.filter(
+                    comment => comment._id.toString() !== targetCommentId.toString()
+                );
+                
+                // Ordena os comentários restantes pelo critério padrão
+                comments.sort((a, b) => {
+                    if (sortBy === 'recents') {
+                        return new Date(b.created_at) - new Date(a.created_at);
+                    } else if (sortBy === 'relevants') {
+                        // Para relevantes, você pode usar outros critérios como upvotes
+                        return (b.upvotes_count || 0) - (a.upvotes_count || 0);
+                    }
+                    return 0;
+                });
+                
+                // Coloca o comentário prioritário no início
+                comments = [priorityComment, ...comments];
+            }
+        } else {
+            // Se não houver sortCommentId, aplica a ordenação padrão
+            if (sortBy === 'recents') {
+                comments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            } else if (sortBy === 'relevants') {
+                comments.sort((a, b) => (b.upvotes_count || 0) - (a.upvotes_count || 0));
+            }
+        }
+
+        // Aplicar paginação APÓS a ordenação
+        const startIndex = (page - 1) * limit;
+        const endIndex = page * limit;
+        const paginatedComments = comments.slice(startIndex, endIndex);
 
         let totalComments;
 
@@ -183,7 +218,7 @@ const getCommentsByPostId = async (req, res) => {
         const totalPages = Math.ceil(totalComments / limit);
 
         res.json({
-            comments,
+            comments: paginatedComments,
             pagination: {
                 page,
                 limit,

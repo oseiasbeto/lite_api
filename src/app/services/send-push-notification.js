@@ -1,31 +1,46 @@
-const axios = require('axios');
+const OneSignal = require('@onesignal/node-onesignal');
+require('dotenv').config();
 
-// Substitua pelos valores do seu OneSignal
-const ONE_SIGNAL_API_URL = process.env.ONE_SIGNAL_API_URL
-const ONE_SIGNAL_APP_ID = process.env.ONE_SIGNAL_APP_ID
-const ONE_SIGNAL_API_KEY = process.env.ONE_SIGNAL_API_KEY
+const ONESIGNAL_APP_ID = process.env.ONE_SIGNAL_APP_ID;
+const ONESIGNAL_API_KEY = process.env.ONE_SIGNAL_APP_KEY;
 
-async function sendPushNotification({playerId, title, message}) {
-    try {
-        const response = await axios.post(ONE_SIGNAL_API_URL
-            ,
-            {
-                app_id: ONE_SIGNAL_APP_ID,
-                include_player_ids: [playerId], // envia para usuário específico
-                headings: { en: title },
-                contents: { en: message },
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Basic ${ONE_SIGNAL_API_KEY}`,
-                },
+const configuration = OneSignal.createConfiguration({
+    authMethods: {
+        app_key: {
+            tokenProvider: {
+                getToken: () => ONESIGNAL_API_KEY
             }
-        );
-        console.log('Notification sent:', response.data);
+        }
+    }
+});
+const client = new OneSignal.DefaultApi(configuration);
+
+const sendPushNotification = async (playerId, largeIcon, title, message, postId) => {
+
+    // 2. Monta o objeto de notificação com a imagem dinâmica
+    const notification = {
+        app_id: ONESIGNAL_APP_ID,
+        headings: { en: `${title}` },
+        contents: { en: `${message}` },
+        include_player_ids: [playerId],
+        ...(largeIcon && {
+            large_icon: largeIcon,
+            ios_attachments: {
+                "avatar": largeIcon
+            }
+        })
+    };
+
+    try {
+        const response = await client.createNotification(notification);
+        console.log(`✅ Notificação enviada para ${playerId}`);
+        return response;
     } catch (error) {
-        console.error('Error sending notification:', error.response?.data || error.message);
+        console.error("❌ Erro ao enviar notificação:", error);
+        throw error;
     }
 }
 
-module.exports = sendPushNotification
+module.exports = sendPushNotification;
+
+// Função simulada para obter a URL do avatar do usuário

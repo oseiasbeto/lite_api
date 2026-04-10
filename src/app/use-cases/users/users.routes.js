@@ -12,8 +12,8 @@ router.put("/:user_id/subscribe", protectedRoute, require("./controllers/subscri
 router.get("/:id", protectedRoute, require("./controllers/get-user-by-id"))
 router.post("/force-offline/:id", protectedRoute, require("./controllers/force-offline"))
 router.put("/", protectedRoute, require("./controllers/update-user-by-id"))
-router.put("/destroy-profile-image", protectedRoute, require("./controllers/destroy-profile-image"))
 router.put("/unread-messages-count", protectedRoute, require("./controllers/update-unread-messages-count"))
+router.put("/unread-notifications-count", protectedRoute, require("./controllers/update-unread-notifications-count"))
 
 // exportando as rotas
 module.exports = router
