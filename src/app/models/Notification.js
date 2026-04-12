@@ -14,16 +14,21 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    senders: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    }],
     type: {
       type: String,
       enum: [
         "new_answer",
-        "new_comment", 
-        "upvote_on_answer", 
+        "new_comment",
+        "upvote_on_post",
+        "upvote_on_answer",
         "upvote_on_comment",
         "reply_to_comment",
         "best_answer",
-        "follow",
+        "new_follower",
         "mention",
       ],
       required: true

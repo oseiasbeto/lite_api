@@ -165,138 +165,187 @@ const createComment = async (req, res) => {
                 .lean();
 
 
-            // Lógica de notificação para o reply
-            const notificationType = parentComment?._id ? "reply_to_comment" : "new_comment";
-            const timeThreshold = new Date(Date.now() - 60 * 60 * 1000); // 1 hora
-            const io = getIO();
-
-            const message = parentComment?._id
-                ? "respondeu à sua resposta."
-                : "comentou ao seu post.";
-
-            // Verifica se o autor está ativo
-
             const author = parentComment?._id ? parentComment?.author : post?.author;
 
-            if (author?.is_online) {
-                const newNotification = new Notification({
-                    recipient: author._id,
-                    sender: userId,
-                    type: notificationType,
-                    post: post._id,
-                    comment: newComment?._id,
-                    message
-                });
+            const isSameUser = author?._id.toString() === userId.toString();
 
-                await newNotification.save()
+            if (!isSameUser) {
+                // Lógica de notificação para o reply
+                const notificationType = parentComment?._id ? "reply_to_comment" : "new_comment";
+                const timeThreshold = new Date(Date.now() - 60 * 60 * 1000); // 1 hora
+                const io = getIO();
 
-                const populatedNotification = await Notification.findOne({
-                    _id: newNotification?._id
-                })
-                    .populate("recipient", "name username verified is_online profile_image")
-                    .populate("sender", "name username verified is_online profile_image")
-                    .populate({
-                        path: "post",
-                        populate: [
-                            {
+                const message = parentComment?._id
+                    ? "respondeu à sua resposta."
+                    : "comentou ao seu post.";
+
+                // Verifica se o autor está ativo
+                if (author?.is_online) {
+                    const newNotification = new Notification({
+                        recipient: author._id,
+                        sender: userId,
+                        type: notificationType,
+                        post: post._id,
+                        comment: newComment?._id,
+                        message
+                    });
+
+                    await newNotification.save()
+
+                    const populatedNotification = await Notification.findOne({
+                        _id: newNotification?._id
+                    })
+                        .populate("recipient", "name username verified is_online profile_image")
+                        .populate("sender", "name username verified is_online profile_image")
+                        .populate({
+                            path: "post",
+                            populate: [
+                                {
+                                    path: "author",
+                                    select: "name username verified is_online profile_image",
+                                },
+                                {
+                                    path: "media",
+                                    select: "url _id type format thumbnail duration post",
+                                },
+                                {
+                                    path: "shared_post",
+                                    populate: [
+                                        {
+                                            path: "author",
+                                            select: "name username verified is_online profile_image",
+                                        },
+                                        {
+                                            path: "media",
+                                            select: "url _id type format thumbnail duration post",
+                                        },
+                                    ],
+                                },
+                            ],
+                        })
+                        .populate({
+                            path: "comment",
+                            populate: {
                                 path: "author",
-                                select: "name username verified is_online profile_image",
-                            },
-                            {
-                                path: "media",
-                                select: "url _id type format thumbnail duration post",
-                            },
-                            {
-                                path: "shared_post",
-                                populate: [
-                                    {
-                                        path: "author",
-                                        select: "name username verified is_online profile_image",
-                                    },
-                                    {
-                                        path: "media",
-                                        select: "url _id type format thumbnail duration post",
-                                    },
-                                ],
-                            },
-                        ],
-                    })
-                    .populate({
-                        path: "comment",
-                        populate: {
-                            path: "author",
-                            select: "name username verified is_online profile_image"
+                                select: "name username verified is_online profile_image"
+                            }
+                        })
+
+                    // Incrementa contador de notificações não lidas
+                    await User.findByIdAndUpdate(author?._id, {
+                        $inc: { unread_notifications_count: 1 },
+                    });
+                    io.to(author.socket_id).emit("new_notification", populatedNotification);
+                    console.log("Emitindo nova notificacao para socket:", author?.socket_id);
+                } else {
+                    // Usuário INATIVO: agrupa notificações e envia push notification
+
+                    // Verifica se já existe uma notificação similar nas últimas horas
+                    let existingNotification = await Notification.findOne({
+                        recipient: recipient._id,
+                        type: notificationType,
+                        post: post._id,
+                        ...(parentComment?._id && { comment: parentComment._id }), // Para replies, associa ao comentário pai
+                        created_at: { $gte: timeThreshold }
+                    }).populate("sender", "name username verified is_online profile_image")
+
+                    if (existingNotification) {
+                        // Verifica se o remetente atual já está na lista de senders
+                        const isNewSender = !existingNotification.senders ||
+                            !existingNotification.senders.some(
+                                senderId => senderId.toString() === userId.toString()
+                            );
+
+                        if (isNewSender) {
+                            // Adiciona o novo remetente à lista
+                            await existingNotification.updateOne({
+                                $addToSet: { senders: userId },
+                                $set: { read: false }
+                            });
+
+                            // Incrementa o contador de notificações não lidas
+                            await User.findByIdAndUpdate(recipient._id, {
+                                $inc: { unread_notifications_count: 1 }
+                            });
+
+                            // Atualiza a mensagem baseada na quantidade de remetentes únicos
+                            const uniqueSendersCount = existingNotification.senders
+                                ? existingNotification.senders.length + 1
+                                : 1;
+
+                            let groupedMessage = "";
+                            if (notificationType === "new_comment") {
+                                groupedMessage = uniqueSendersCount === 1
+                                    ? "comentou no seu post."
+                                    : `${uniqueSendersCount} pessoas comentaram no seu post.`;
+                            } else {
+                                groupedMessage = uniqueSendersCount === 1
+                                    ? "respondeu à sua resposta."
+                                    : `${uniqueSendersCount} pessoas responderam à sua resposta.`;
+                            }
+
+                            await existingNotification.updateOne({
+                                $set: { message: groupedMessage }
+                            });
+
+                            // ENVIA PUSH NOTIFICATION para o usuário inativo
+                            const user = await User.findById(recipient._id)
+                                .select("player_id_onesignal profile_image settings");
+                            if (user && user?.player_id_onesignal && user?.settings?.notification?.push) {
+                                const pushData = {
+                                    userId: recipient._id,
+                                    title: "Nova interação!",
+                                    body: `${req.user.name || "Alguém"} ${groupedMessage}`,
+                                    ...(existingNotification?.sender?.profile_image?.thumbnails?.push_notification && {
+                                        largeIcon: existingNotification?.sender?.profile_image?.thumbnails?.push_notification
+                                    })
+                                };
+
+                                try {
+                                    await sendPushNotification(pushData)
+                                    console.log(`Push notification enviada para ${recipient._id}`);
+                                } catch (pushError) {
+                                    console.error("Erro ao enviar push notification:", pushError);
+                                }
+                            }
                         }
-                    })
-
-                // Incrementa contador de notificações não lidas
-                await User.findByIdAndUpdate(author?._id, {
-                    $inc: { unread_notifications_count: 1 },
-                });
-                io.to(author.socket_id).emit("new_notification", populatedNotification);
-                console.log("Emitindo nova notificacao para socket:", author?.socket_id);
-            } else {
-                // Usuário INATIVO: agrupa notificações e envia push notification
-
-                // Verifica se já existe uma notificação similar nas últimas horas
-                let existingNotification = await Notification.findOne({
-                    recipient: recipient._id,
-                    type: notificationType,
-                    post: post._id,
-                    ...(parentComment?._id && { comment: parentComment._id }), // Para replies, associa ao comentário pai
-                    created_at: { $gte: timeThreshold }
-                }).populate("sender", "name username verified is_online profile_image")
-
-                if (existingNotification) {
-                    // Verifica se o remetente atual já está na lista de senders
-                    const isNewSender = !existingNotification.senders ||
-                        !existingNotification.senders.some(
-                            senderId => senderId.toString() === userId.toString()
-                        );
-
-                    if (isNewSender) {
-                        // Adiciona o novo remetente à lista
-                        await existingNotification.updateOne({
-                            $addToSet: { senders: userId },
-                            $set: { read: false }
+                    } else {
+                        // Cria uma nova notificação agrupada
+                        const newNotification = new Notification({
+                            recipient: recipient._id,
+                            senders: [userId],
+                            sender: userId, // Mantém compatibilidade com esquema antigo
+                            type: notificationType,
+                            post: post._id,
+                            ...(parentComment?._id && { comment: parentComment._id }),
+                            comment: newComment._id,
+                            message: parentComment?._id
+                                ? "respondeu à sua resposta."
+                                : "comentou ao seu post.",
+                            read: false,
+                            created_at: new Date()
                         });
 
-                        // Incrementa o contador de notificações não lidas
+                        await newNotification.save();
+
+                        // Incrementa contador de notificações não lidas
                         await User.findByIdAndUpdate(recipient._id, {
                             $inc: { unread_notifications_count: 1 }
                         });
 
-                        // Atualiza a mensagem baseada na quantidade de remetentes únicos
-                        const uniqueSendersCount = existingNotification.senders
-                            ? existingNotification.senders.length + 1
-                            : 1;
-
-                        let groupedMessage = "";
-                        if (notificationType === "new_comment") {
-                            groupedMessage = uniqueSendersCount === 1
-                                ? "comentou no seu post."
-                                : `${uniqueSendersCount} pessoas comentaram no seu post.`;
-                        } else {
-                            groupedMessage = uniqueSendersCount === 1
-                                ? "respondeu à sua resposta."
-                                : `${uniqueSendersCount} pessoas responderam à sua resposta.`;
-                        }
-
-                        await existingNotification.updateOne({
-                            $set: { message: groupedMessage }
-                        });
-
                         // ENVIA PUSH NOTIFICATION para o usuário inativo
-                        const user = await User.findById(recipient._id)
-                        .select("player_id_onesignal profile_image settings");
-                        if (user && user?.player_id_onesignal && user?.settings?.notification?.push) {
+                        const user = await User.findById(recipient._id);
+                        if (user && user.push_subscription && user.push_subscription.enabled) {
                             const pushData = {
                                 userId: recipient._id,
                                 title: "Nova interação!",
-                                body: `${req.user.name || "Alguém"} ${groupedMessage}`,
-                                ...(existingNotification?.sender?.profile_image?.thumbnails?.push_notification && {
-                                    largeIcon: existingNotification?.sender?.profile_image?.thumbnails?.push_notification
-                                })
+                                body: `${req.user.name || "Alguém"} ${parentComment?._id ? "respondeu à sua resposta" : "comentou no seu post"}`,
+                                data: {
+                                    type: notificationType,
+                                    postId: post._id,
+                                    commentId: newComment._id,
+                                    senderId: userId
+                                }
                             };
 
                             try {
@@ -305,52 +354,6 @@ const createComment = async (req, res) => {
                             } catch (pushError) {
                                 console.error("Erro ao enviar push notification:", pushError);
                             }
-                        }
-                    }
-                } else {
-                    // Cria uma nova notificação agrupada
-                    const newNotification = new Notification({
-                        recipient: recipient._id,
-                        senders: [userId],
-                        sender: userId, // Mantém compatibilidade com esquema antigo
-                        type: notificationType,
-                        post: post._id,
-                        ...(parentComment?._id && { comment: parentComment._id }),
-                        comment: newComment._id,
-                        message: parentComment?._id
-                            ? "respondeu à sua resposta."
-                            : "comentou ao seu post.",
-                        read: false,
-                        created_at: new Date()
-                    });
-
-                    await newNotification.save();
-
-                    // Incrementa contador de notificações não lidas
-                    await User.findByIdAndUpdate(recipient._id, {
-                        $inc: { unread_notifications_count: 1 }
-                    });
-
-                    // ENVIA PUSH NOTIFICATION para o usuário inativo
-                    const user = await User.findById(recipient._id);
-                    if (user && user.push_subscription && user.push_subscription.enabled) {
-                        const pushData = {
-                            userId: recipient._id,
-                            title: "Nova interação!",
-                            body: `${req.user.name || "Alguém"} ${parentComment?._id ? "respondeu à sua resposta" : "comentou no seu post"}`,
-                            data: {
-                                type: notificationType,
-                                postId: post._id,
-                                commentId: newComment._id,
-                                senderId: userId
-                            }
-                        };
-
-                        try {
-                            await sendPushNotification(pushData);
-                            console.log(`Push notification enviada para ${recipient._id}`);
-                        } catch (pushError) {
-                            console.error("Erro ao enviar push notification:", pushError);
                         }
                     }
                 }
