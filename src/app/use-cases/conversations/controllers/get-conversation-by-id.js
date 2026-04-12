@@ -51,7 +51,7 @@ const getConversationById = async (req, res) => {
             type: conv.type,
             xyz_id: conv.type === 'direct' ? otherUser?.user?._id : undefined,
             name: conv.type === 'direct' ? otherUser?.user?.name || 'Usuário' : conv.name,
-            avatar: conv.type === 'direct' ? otherUser?.user?.profile_image?.url : conv.avatar,
+            avatar: conv.type === 'direct' ? otherUser?.user?.profile_image : conv.avatar,
             is_online: conv.type === 'direct' ? otherUser?.user?.is_online : false,
             last_seen: conv.type === 'direct' ? otherUser?.user?.last_seen : null,
             is_verified: conv.type === 'direct' ? otherUser?.user?.is_verified : false,

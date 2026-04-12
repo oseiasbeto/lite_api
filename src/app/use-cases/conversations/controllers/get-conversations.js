@@ -85,7 +85,7 @@ const getConversations = async (req, res) => {
                 type: conv.type,
                 xyz_id: conv.type === 'direct' ? otherParticipant?.user?._id : undefined,
                 name: conv.type === 'direct' ? otherParticipant?.user?.name || 'Usuário' : conv.name,
-                avatar: conv.type === 'direct' ? otherParticipant?.user?.profile_image?.url : conv.avatar,
+                avatar: conv.type === 'direct' ? otherParticipant?.user?.profile_image : conv.avatar,
                 is_online: conv.type === 'direct' ? otherParticipant?.user?.is_online : false,
                 last_seen: conv.type === 'direct' ? otherParticipant?.user?.last_seen : null,
                 is_verified: conv.type === 'direct' ? otherParticipant?.user?.is_verified : false,
