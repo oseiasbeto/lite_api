@@ -33,7 +33,7 @@ const forgotPassword = async (req, res) => {
 
         user.reset_password_code = verificationCode;
         user.reset_password_expires = codeExpires
-        user.reset_password_attempts += 1
+        user.reset_password_attempts = 1
 
         await user.save();
 

@@ -13,27 +13,13 @@ const createPost = async (req, res) => {
       audience,
       isAnonymous,
       selectedTopics,
-      postType = 'question',
       sharedPost
     } = req.body;
 
     const userId = req.user.id;
 
-
-    if (postType === 'question' && !postQuestion)
-      return res.status(400).json({
-        success: false,
-        message: "Informe a pergunta"
-      })
-    else if (postQuestion.length > 300) {
-      return res.status(400).json({
-        success: false,
-        error: "O post não pode ter mais de 300 caracteres",
-      });
-    }
-
     // Validação manual
-    if (!content.trim() && media.length === 0 && postType !== 'question') {
+    if (!content.trim() && media.length === 0) {
       return res.status(400).json({
         success: false,
         error: "O post deve conter texto ou mídia",
@@ -133,7 +119,6 @@ const createPost = async (req, res) => {
       content: content,
       author: userId,
       question: postQuestion,
-      type: postType,
       is_anonymous: isAnonymous,
       topics: selectedTopics ? selectedTopics : [],
       audience: audience,

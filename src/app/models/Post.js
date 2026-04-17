@@ -2,25 +2,6 @@ const mongoose = require("mongoose");
 
 const post = new mongoose.Schema(
   {
-    type: {
-      type: String,
-      enum: ['question', 'post'],
-      default: 'question',
-      index: true
-    },
-
-    question: {
-      type: String,
-      trim: true,
-      maxlength: 300,
-      required: [
-        function () {
-          return this.type === 'question';
-        },
-        "A pergunta e obrigatoria."
-      ]
-    },
-
     content: {
       type: String,
       trim: true,

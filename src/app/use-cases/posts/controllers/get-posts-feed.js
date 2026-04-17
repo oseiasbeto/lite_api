@@ -26,7 +26,7 @@ const getPostsFeed = async (req, res) => {
       .limit(limit)
       .populate({
         path: "media",
-        select: "url _id type format thumbnail duration post",
+        select: "url _id type width height format thumbnail duration post",
       })
       .populate(
         "author",
@@ -42,7 +42,7 @@ const getPostsFeed = async (req, res) => {
           },
           {
             path: "media",
-            select: "url _id type format thumbnail duration post",
+            select: "url _id type width height format thumbnail duration post",
           },
         ],
       })
