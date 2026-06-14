@@ -1,7 +1,7 @@
 const User = require('../../../models/User');
 const moment = require('moment');
 const crypto = require('crypto');
-//const sendMail = require('../../../mail/sendMail');
+const sendMail = require('../../../mail/send-mail');
 
 const forgotPassword = async (req, res) => {
     try {
@@ -40,14 +40,14 @@ const forgotPassword = async (req, res) => {
         const appEnv = process.env?.NODE_ENV || 'dev'
 
         if (appEnv === 'prod') {
-            /*
-          // 6. Envia e-mail com código
-          await sendVerificationEmail({
-            to: user.email,
-            name: user.name,
-            code: verificationCode
-          }); 
-          */
+            const title = 'Redefinição de senha';
+            const message = `Olá ${user.name}, recebemos uma solicitação para redefinir sua senha no 1kole. Use o código abaixo para continuar.`;
+
+            await sendMail(user.email, "reset_password", title, {
+                code: verificationCode,
+                title,
+                message
+            });
         } else {
             console.log("OTP de recuperar senha:", verificationCode)
         }

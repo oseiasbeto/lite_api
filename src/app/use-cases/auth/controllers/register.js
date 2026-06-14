@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const moment = require("moment");
 const User = require('../../../models/User');
 const generateUsernameByEmail = require('../../../utils/generate-username-by-email');
+const sendMail = require("../../../mail/send-mail");
 
 const register = async (req, res) => {
   try {
@@ -40,14 +41,15 @@ const register = async (req, res) => {
           await existingUser.save()
 
           if (existingUser.email_code_attempts < 5) {
-            /*
-         Envia e-mail com código
-        sendVerificationEmail({
-          to: user.email,
-          name: user.name,
-          code: verificationCode
-        }); 
-        */
+            // Dentro do bloco de envio de e-mail (substitua o comentário)
+            const title = 'Verifique seu e-mail';
+            const message = `Olá ${existingUser.name}, use o código abaixo para verificar sua conta no 1kole.`;
+
+            await sendMail(existingUser.email, "confirmation_code", title, { 
+              code: verificationCode, 
+              title, 
+              message 
+            });
           }
 
           return res.status(200).send()
@@ -72,18 +74,18 @@ const register = async (req, res) => {
       const appEnv = process.env?.NODE_ENV || 'dev'
 
       if (appEnv === 'prod') {
-        /*
-      // 6. Envia e-mail com código
-      await sendVerificationEmail({
-        to: user.email,
-        name: user.name,
-        code: verificationCode
-      }); 
-      */
+          // Dentro do bloco de envio de e-mail (substitua o comentário)
+          const title = 'Verifique seu e-mail';
+          const message = `Olá ${user.name}, use o código abaixo para verificar sua conta no 1kole.`;
+
+          await sendMail(user.email, "confirmation_code", title, { 
+              code: verificationCode, 
+              title, 
+              message 
+          });
       } else {
         console.log("OTP de registro de conta:", verificationCode)
       }
-
 
       // 7. Resposta de sucesso
       res.status(201).json({

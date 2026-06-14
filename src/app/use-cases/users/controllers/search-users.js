@@ -12,7 +12,7 @@ const searchUsers = async (req, res) => {
         { name: { $regex: q, $options: 'i' } },
         { phone_number: { $regex: q, $options: 'i' } },
       ],
-      _id: { $ne: req.user.id },
+      //_id: { $ne: req.user.id },
       account_verification_status: 'verified'
     })
       .select('name bio last_seen is_verified is_online username profile_image url')

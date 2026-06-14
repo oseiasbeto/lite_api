@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-// Função para ler e compilar templates dinamicamente
+// 🔹 Função para ler e compilar templates dinamicamente
 async function loadTemplate(templateName, data) {
     const templatePath = path.join(__dirname, 'templates', `${templateName}.html`);
     const templateFile = fs.readFileSync(templatePath, 'utf-8');
@@ -24,14 +24,14 @@ async function loadTemplate(templateName, data) {
     return compiledTemplate(data);
 }
 
-// Função principal para envio de emails
+// 🔹 Função principal para envio de emails
 async function sendMail(to, templateName, subject, data) {
     try {
         const html = await loadTemplate(templateName, data);
 
         console.log(`📤 Enviando email para ${to}...`);
         const info = await transporter.sendMail({
-            from: 'PapoRápido <geral@paporápido.com>',
+            from: '1Kole <suporte@1kole.com>',
             to,
             subject,
             html,

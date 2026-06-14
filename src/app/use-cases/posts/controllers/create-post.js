@@ -19,7 +19,7 @@ const createPost = async (req, res) => {
     const userId = req.user.id;
 
     // Validação manual
-    if (!content.trim() && media.length === 0) {
+    if (!content.trim() && media.length === 0 && !sharedPost) {
       return res.status(400).json({
         success: false,
         error: "O post deve conter texto ou mídia",
@@ -156,151 +156,9 @@ const createPost = async (req, res) => {
         })
         .lean();
 
-      // Se for reply, atualizar o post original e criar notificação
-      if (false && sharedPostDoc && populatedPost) {
+        // [TODO] Caso haja um sharePost envie uma notification para o autor
 
-
-        if (sharedPostDoc.author?._id.toString() !== userId.toString()) {
-          // Lógica de notificação para o reply
-          const notificationType = "reply";
-          const timeThreshold = new Date(Date.now() - 60 * 60 * 1000); // 1 hora
-          const io = getIO();
-
-          // Determinar a mensagem com base no tipo de reply
-          const isNestedReply = sharedPostDoc.is_reply; // Verifica se o sharedPostDoc é uma resposta
-          const message = isNestedReply
-            ? "respondeu à sua resposta."
-            : "respondeu ao seu post.";
-
-          // Verifica se o autor está ativo
-          const isAuthorActive =
-            sharedPostDoc.author.activity_status.is_active &&
-            sharedPostDoc.author.activity_status.socket_id &&
-            typeof sharedPostDoc.author.activity_status.socket_id ===
-            "string";
-
-          if (isAuthorActive) {
-            // Se o autor está ativo, cria uma notificação individual para cada reply
-            const notification = new Notification({
-              recipient: sharedPostDoc.author._id,
-              senders: [userId],
-              type: notificationType,
-              target: populatedPost._id,
-              module: postModule,
-              target_model: "Post",
-              message,
-              read: false,
-            });
-            await notification.save();
-
-            // Busca detalhes do remetente
-            const senderDetails = await User.find(
-              { _id: { $in: [userId] } },
-              "username name profile_image verified"
-            ).lean();
-
-            // Incrementa contador de notificações não lidas
-            await User.findByIdAndUpdate(sharedPostDoc.author._id, {
-              $inc: { unread_notifications_count: 1 },
-            });
-
-            // Emite notificação em tempo real
-            console.log(
-              "Emitindo newNotification para socket:",
-              sharedPostDoc.author.activity_status.socket_id
-            );
-            io.to(sharedPostDoc.author.activity_status.socket_id).emit(
-              "newNotification",
-              {
-                _id: notification._id,
-                type: notificationType,
-                message,
-                module: notification.module,
-                created_at: notification.created_at,
-                updated_at: Date.now(),
-                target: populatedPost,
-                target_model: "Post",
-                senders: senderDetails,
-              }
-            );
-          } else {
-            // Se o autor está inativo, tenta agrupar notificações
-            let existingNotification = await Notification.findOne({
-              recipient: sharedPostDoc.author._id,
-              type: notificationType,
-              target: sharedPostDoc._id,
-              created_at: { $gte: timeThreshold },
-            }).populate({
-              path: "target",
-              select: "content text author created_at",
-              populate: {
-                path: "author",
-                select: "username profile_image name",
-              },
-            });
-
-            if (existingNotification) {
-              // Agrupa notificações de replies para o mesmo post/resposta
-              let updatedSenders = [...existingNotification.senders];
-              let isNewSender = !updatedSenders.find(
-                (sender) => sender._id.toString() === userId.toString()
-              );
-
-              if (isNewSender) {
-                updatedSenders.push(userId);
-              }
-
-              const totalSenders = updatedSenders.length;
-              const groupedMessage =
-                totalSenders === 1
-                  ? message
-                  : isNestedReply
-                    ? "responderam à sua resposta."
-                    : "responderam ao seu post.";
-
-              // Atualiza a notificação existente
-              await existingNotification.updateOne({
-                $set: { message: groupedMessage, read: false },
-                $addToSet: { senders: userId }, // Usa $addToSet para evitar duplicatas no array
-              });
-
-              // Incrementa contador de notificações não lidas apenas se for um novo remetente
-              if (isNewSender) {
-                await User.findByIdAndUpdate(sharedPostDoc.author._id, {
-                  $inc: { unread_notifications_count: 1 },
-                });
-              }
-            } else {
-              // Cria uma nova notificação para o reply (usuário inativo)
-              const notification = new Notification({
-                recipient: sharedPostDoc.author._id,
-                senders: [userId],
-                type: notificationType,
-                target: sharedPostDoc._id,
-                module: postModule,
-                target_model: "Post",
-                message,
-                read: false,
-              });
-              await notification.save();
-
-              // Incrementa contador de notificações não lidas
-              await User.findByIdAndUpdate(sharedPostDoc.author._id, {
-                $inc: { unread_notifications_count: 1 },
-              });
-            }
-          }
-        }
-
-        // Atualizar contador de posts do usuário (apenas para posts não-replies)
-        if (!isReply) {
-          await User.findOneAndUpdate(
-            { _id: newPost.author },
-            { $inc: { posts_count: 1 } }
-          );
-        }
-      }
-
+        // [TODO] Enviar uma notificacao para ate no maximo mil subscritores
       // Retornar resposta
       res.status(201).json({
         new_post: populatedPost,
