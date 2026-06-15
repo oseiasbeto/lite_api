@@ -9,7 +9,6 @@ const register = async (req, res) => {
   try {
     const { name, email } = req.body;
 
-    // 1. Validações básicas
     if (!name || !email) {
       return res.status(400).json({ 
         success: false, 
@@ -17,86 +16,82 @@ const register = async (req, res) => {
       });
     }
 
-    // Gera código de verificação de 6 dígitos
-    const verificationCode = crypto.randomInt(100000, 999999);
-    const codeExpires = Date.now() + 15 * 60 * 1000; // 15 minutos
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = await User.findOne({ email: normalizedEmail });
 
-    // Verifica se e-mail já existe
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    // Caso 1: Usuário já existe e está verificado
+    if (existingUser && existingUser.account_verification_status === 'verified') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Este e-mail já está em uso e a conta já foi verificada.' 
+      });
+    }
 
-    if (existingUser) {
-      // Se o usuário já está verificado (conta ativa)
-      if (existingUser.account_verification_status !== 'pending') {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Este e-mail já está em uso e a conta já foi verificada.' 
-        });
-      }
+    // Gera um novo código (caso precise)
+    const generateNewCode = () => crypto.randomInt(100000, 999999);
+    const codeExpires = () => Date.now() + 15 * 60 * 1000;
 
-      // Caso pendente: verifica se o código anterior ainda é válido
+    // Caso 2: Usuário pendente (existe mas não verificado)
+    if (existingUser && existingUser.account_verification_status === 'pending') {
       const now = moment();
-      const expiration_time = moment(existingUser.email_code_expires);
+      const expiration = moment(existingUser.email_code_expires);
 
-      if (now.isBefore(expiration_time)) {
-        // Código anterior ainda ativo → apenas reenvia o MESMO código
-        // (ou gera um novo? Para segurança, é melhor reenviar o mesmo código)
-        // Vou manter a geração de um novo código, mas sem incrementar tentativas
-        existingUser.email_code = Number(verificationCode);
-        existingUser.email_code_expires = codeExpires;
-        // NÃO incrementa email_code_attempts – esse campo é só para validação do OTP
-        await existingUser.save();
-
-        // Envia e-mail com o novo código
+      if (now.isBefore(expiration)) {
+        //  Código ainda válido → reenvia o MESMO código (sem gerar novo)
+        const currentCode = existingUser.email_code;
         const title = 'Verifique seu e-mail';
-        const message = `Olá ${existingUser.name}, use o código abaixo para verificar sua conta no 1kole.`;
+        const message = `Olá ${existingUser.name}, reutilize o código abaixo para verificar sua conta no 1kole.`;
+
         await sendMail(existingUser.email, "confirmation_code", title, { 
-          code: verificationCode, 
+          code: currentCode, 
           title, 
           message 
         });
 
         return res.status(200).json({
           success: true,
-          message: 'Novo código de verificação enviado para o e-mail.',
+          message: 'Código reenviado (o mesmo anterior ainda é válido).',
           userId: existingUser._id
         });
       } else {
-        // Código expirado – podemos permitir reenvio com novo código
-        existingUser.email_code = Number(verificationCode);
-        existingUser.email_code_expires = codeExpires;
-        existingUser.email_code_attempts = 0; // reseta tentativas
+        // Código expirado → gera novo código, reseta tentativas e envia
+        const newCode = generateNewCode();
+        existingUser.email_code = Number(newCode);
+        existingUser.email_code_expires = codeExpires();
+        existingUser.email_code_attempts = 0; // reset
         await existingUser.save();
 
         const title = 'Verifique seu e-mail';
         const message = `Olá ${existingUser.name}, seu código expirou. Use o novo código abaixo.`;
         await sendMail(existingUser.email, "confirmation_code", title, { 
-          code: verificationCode, 
+          code: newCode, 
           title, 
           message 
         });
 
         return res.status(200).json({
           success: true,
-          message: 'Código expirado. Novo código enviado para o e-mail.',
+          message: 'Código expirado. Novo código enviado.',
           userId: existingUser._id
         });
       }
     }
 
-    // ---------- Criação de novo usuário (não existe) ----------
+    // Caso 3: Novo usuário (não existe)
+    const verificationCode = generateNewCode();
     const user = new User({
       name: name.trim(),
-      username: generateUsernameByEmail(email),
-      email: email.toLowerCase().trim(),
+      username: generateUsernameByEmail(normalizedEmail),
+      email: normalizedEmail,
       email_code: Number(verificationCode),
-      email_code_expires: codeExpires,
-      email_code_attempts: 0,  // ainda não tentou validar
+      email_code_expires: codeExpires(),
+      email_code_attempts: 0,
+      account_verification_status: 'pending' // explícito
     });
 
     await user.save();
 
     const appEnv = process.env.NODE_ENV || 'dev';
-
     if (appEnv === 'prod') {
       const title = 'Verifique seu e-mail';
       const message = `Olá ${user.name}, use o código abaixo para verificar sua conta no 1kole.`;
@@ -106,7 +101,6 @@ const register = async (req, res) => {
         message 
       });
     } else {
-      // Em desenvolvimento, loga o código sem expô-lo em produção
       console.log(`[DEV] OTP para ${user.email}: ${verificationCode}`);
     }
 
