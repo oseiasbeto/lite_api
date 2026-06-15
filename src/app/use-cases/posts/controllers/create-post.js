@@ -145,10 +145,16 @@ const createPost = async (req, res) => {
         )
         .populate({
           path: "shared_post",
-          populate: {
-            path: "author",
-            select: "name verified is_online profile_image unread_notifications_count"
-          },
+          populate: [
+            {
+              path: "author",
+              select: "name verified is_online profile_image unread_notifications_count"
+            },
+            {
+              path: "media",
+              select: "url type thumbnail format width height duration"
+            }
+          ],
         })
         .populate({
           path: "media",
@@ -156,9 +162,9 @@ const createPost = async (req, res) => {
         })
         .lean();
 
-        // [TODO] Caso haja um sharePost envie uma notification para o autor
+      // [TODO] Caso haja um sharePost envie uma notification para o autor
 
-        // [TODO] Enviar uma notificacao para ate no maximo mil subscritores
+      // [TODO] Enviar uma notificacao para ate no maximo mil subscritores
       // Retornar resposta
       res.status(201).json({
         new_post: populatedPost,

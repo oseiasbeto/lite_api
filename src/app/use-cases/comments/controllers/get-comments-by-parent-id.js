@@ -32,11 +32,11 @@ const getCommentsByParentId = async (req, res) => {
       })
       .populate(
         "author",
-        "name username verified is_online profile_image"
+        "name username is_verified is_online profile_image"
       )
       .populate(
         "reply_to",
-        "name username verified is_online profile_image"
+        "name username is_verified is_online profile_image"
       )
       .populate({
         path: "parent",
@@ -44,7 +44,7 @@ const getCommentsByParentId = async (req, res) => {
           {
             path: "author",
             select:
-              "name username verified is_online profile_image",
+              "name username is_verified is_online profile_image",
           },
           {
             path: "media",

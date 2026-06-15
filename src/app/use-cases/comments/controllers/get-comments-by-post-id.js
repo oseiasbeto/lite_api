@@ -80,6 +80,7 @@ const getCommentsByPostId = async (req, res) => {
                                             _id: '$author._id',
                                             name: '$author.name',
                                             username: '$author.username',
+                                            is_verified: '$author.is_verified',
                                             profile_image: '$author.profile_image'
                                         },
                                         else: null
@@ -124,6 +125,7 @@ const getCommentsByPostId = async (req, res) => {
                                 _id: '$author._id',
                                 name: '$author.name',
                                 username: '$author.username',
+                                is_verified: '$author.is_verified',
                                 profile_image: '$author.profile_image'
                             },
                             else: null
