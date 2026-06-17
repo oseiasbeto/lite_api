@@ -50,7 +50,7 @@ const createPost = async (req, res) => {
         })
         .populate(
           "author",
-          "name is_verified is_online profile_image"
+          "name is_verified credentials is_online profile_image"
         )
       if (!sharedPostDoc) {
         return res.status(404).json({
@@ -63,7 +63,7 @@ const createPost = async (req, res) => {
     // Verificar se o autor do post original existe (para replies)
     if (sharedPostDoc) {
       const author = await User.findById(sharedPostDoc.author._id).select(
-        "username is_online unread_notifications_count"
+        "username credentials is_online unread_notifications_count"
       );
       if (!author) {
         return res.status(400).json({
@@ -141,14 +141,14 @@ const createPost = async (req, res) => {
       const populatedPost = await Post.findById(newPost._id)
         .populate(
           "author",
-          "name is_verified is_online profile_image unread_notifications_count"
+          "name is_verified credentials is_online profile_image unread_notifications_count"
         )
         .populate({
           path: "shared_post",
           populate: [
             {
               path: "author",
-              select: "name is_verified is_online profile_image unread_notifications_count"
+              select: "name is_verified credentials is_online profile_image unread_notifications_count"
             },
             {
               path: "media",
