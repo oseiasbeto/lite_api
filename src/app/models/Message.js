@@ -26,6 +26,10 @@ const messageSchema = new mongoose.Schema({
       ref: "Media", // Referência à coleção Media
     },
   ],
+  file_url: String,
+  file_thumb: String,
+  file_duration: String,
+  file_size: String,
   
   // Reply (responder mensagem)
   reply_to: {

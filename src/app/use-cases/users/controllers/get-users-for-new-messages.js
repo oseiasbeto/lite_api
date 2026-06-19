@@ -5,8 +5,30 @@ const Conversation = require('../../../models/Conversation');
 const getUsersForNewMessage = async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 30;
+    
+    // ===== CORREÇÃO DE SEGURANÇA: Validação robusta dos parâmetros =====
+    let page = parseInt(req.query.page);
+    let limit = parseInt(req.query.limit);
+    
+    // Validação contra injeção NoSQL e valores maliciosos
+    if (!Number.isInteger(page) || page < 1) {
+      page = 1;
+    }
+    
+    if (!Number.isInteger(limit) || limit < 1) {
+      limit = 30;
+    }
+    
+    // Limite máximo para prevenir DoS (Denial of Service)
+    if (limit > 100) {
+      limit = 100;
+    }
+    
+    // Limite máximo para página (evita que o usuário tente acessar páginas muito distantes)
+    if (page > 1000) {
+      page = 1000;
+    }
+    // ===== FIM DA CORREÇÃO =====
 
     // 1. Usuários com quem já conversei (sempre no topo, sem paginação)
     const directCon = await Conversation.find({
@@ -49,7 +71,8 @@ const getUsersForNewMessage = async (req, res) => {
             source: 'chat'
           }
         } else return
-      });
+      })
+      .filter(Boolean); // Remove undefined/null values
       
     const chattedUserIds = new Set(chattedUsers.map(u => u?.user?._id.toString()));
 
@@ -90,8 +113,17 @@ const getUsersForNewMessage = async (req, res) => {
     });
 
     const total = totalChatted + totalOthers;
-    const alreadySentTotal = (page - 1) * limit + usersThisPage.length;
-    const hasMore = alreadySentTotal < total;
+    
+    // ===== CORREÇÃO DO hasMore =====
+    // Calcula quantos itens já foram enviados (páginas anteriores)
+    const itemsSentBefore = (page - 1) * limit;
+    // Verifica se ainda existem itens após a página atual
+    const hasMore = itemsSentBefore + usersThisPage.length < total;
+    // ===== FIM DA CORREÇÃO =====
+
+    // ===== NOVO: Cálculo do totalPages =====
+    const totalPages = Math.ceil(total / limit);
+    // ===== FIM =====
 
     res.json({
       success: true,
@@ -99,6 +131,7 @@ const getUsersForNewMessage = async (req, res) => {
       page,
       limit,
       total,
+      totalPages, // <-- ADICIONADO
       hasMore
     });
   } catch (error) {

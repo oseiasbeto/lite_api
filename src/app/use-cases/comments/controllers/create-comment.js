@@ -145,18 +145,18 @@ const createComment = async (req, res) => {
             const populatedComment = await Comment.findById(newComment._id)
                 .populate(
                     "author",
-                    "name username verified is_online profile_image"
+                    "name username is_verified is_online profile_image"
                 )
                 .populate({
                     path: 'parent',
                     populate: {
                         path: 'author',
-                        select: 'name username verified is_online profile_image'
+                        select: 'name username is_verified is_online profile_image'
                     }
                 })
                 .populate({
                     path: 'reply_to',
-                    select: 'name username verified is_online profile_image'
+                    select: 'name username is_verified is_online profile_image'
                 })
                 .populate({
                     path: "media",
@@ -195,14 +195,14 @@ const createComment = async (req, res) => {
                     const populatedNotification = await Notification.findOne({
                         _id: newNotification?._id
                     })
-                        .populate("recipient", "name username verified is_online profile_image")
-                        .populate("sender", "name username verified is_online profile_image")
+                        .populate("recipient", "name username is_verified is_online profile_image")
+                        .populate("sender", "name username is_verified is_online profile_image")
                         .populate({
                             path: "post",
                             populate: [
                                 {
                                     path: "author",
-                                    select: "name username verified is_online profile_image",
+                                    select: "name username is_verified is_online profile_image",
                                 },
                                 {
                                     path: "media",
@@ -213,7 +213,7 @@ const createComment = async (req, res) => {
                                     populate: [
                                         {
                                             path: "author",
-                                            select: "name username verified is_online profile_image",
+                                            select: "name username is_verified is_online profile_image",
                                         },
                                         {
                                             path: "media",
@@ -227,7 +227,7 @@ const createComment = async (req, res) => {
                             path: "comment",
                             populate: {
                                 path: "author",
-                                select: "name username verified is_online profile_image"
+                                select: "name username is_verified is_online profile_image"
                             }
                         })
 
@@ -247,7 +247,7 @@ const createComment = async (req, res) => {
                         post: post._id,
                         ...(parentComment?._id && { comment: parentComment._id }), // Para replies, associa ao comentário pai
                         created_at: { $gte: timeThreshold }
-                    }).populate("sender", "name username verified is_online profile_image")
+                    }).populate("sender", "name username is_verified is_online profile_image")
 
                     if (existingNotification) {
                         // Verifica se o remetente atual já está na lista de senders

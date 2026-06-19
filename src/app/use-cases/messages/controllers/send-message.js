@@ -5,10 +5,22 @@ const User = require('../../../models/User')
 const { emitToUser } = require("../../../services/socket");
 const sendPushNotification = require("../../../services/send-push-notification");
 
+const MAX_VOICE_DURATION = 60; // segundos
+
 const sendMessage = async (req, res) => {
   try {
     const { convId, content, source, message_type = 'text', reply_to, file_url, file_thumb, file_duration, file_size } = req.body;
     const senderId = req.user.id;
+
+    // Validação simples pra voz (não interfere no resto)
+    if (message_type === 'voice') {
+      if (!file_url) {
+        return res.status(400).json({ message: "URL do áudio é obrigatória" });
+      }
+      if (file_duration && file_duration > MAX_VOICE_DURATION) {
+        return res.status(400).json({ message: "Áudio excede o limite de 1 minuto" });
+      }
+    }
 
     // 1. Busca a conversa + participantes com socket_id
     const conversation = await Conversation.findById(convId)
@@ -37,7 +49,7 @@ const sendMessage = async (req, res) => {
 
     const otherParticipant = isFirstMessage ? conversation.participants.find(p => p?.user?._id.toString() === senderId)
       : conversation.participants.find(p => p?.user?._id.toString() !== senderId.toString())
-      
+
     let originalMessageReplyTo = null
 
     if (reply_to) {
@@ -142,16 +154,17 @@ const sendMessage = async (req, res) => {
 
       if (participant?.user?.is_online) {
         emitToUser(participant?.user?._id.toString(), 'new_message', messageToSend)
-        await User.updateOne({
-          _id: participant?.user?._id
-        }, {
-          $inc: {
-            unread_messages_count: 1
-          }
-        })
       } else {
         // [TODO] Enviar push notification
       }
+
+      await User.updateOne({
+        _id: participant?.user?._id
+      }, {
+        $inc: {
+          unread_messages_count: 1
+        }
+      })
     });
 
     conversation.unread_count.set(senderId, 0);
