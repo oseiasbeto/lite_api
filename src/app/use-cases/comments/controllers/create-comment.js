@@ -275,8 +275,8 @@ const createComment = async (req, res) => {
                             let groupedMessage = "";
                             if (notificationType === "new_comment") {
                                 groupedMessage = uniqueSendersCount === 1
-                                    ? "comentou no seu post."
-                                    : `${uniqueSendersCount} pessoas comentaram no seu post.`;
+                                    ? "comentou o seu post."
+                                    : `${uniqueSendersCount} pessoas comentaram o seu post.`;
                             } else {
                                 groupedMessage = uniqueSendersCount === 1
                                     ? "respondeu à sua resposta."
@@ -290,11 +290,14 @@ const createComment = async (req, res) => {
                             // ENVIA PUSH NOTIFICATION para o usuário inativo
                             const user = await User.findById(author._id) // FIXED: changed from recipient to author
                                 .select("player_id_onesignal profile_image settings");
-                            if (user && user?.player_id_onesignal && user?.settings?.notification?.push) {
+
+
+                            if (user?.player_id_onesignal && user?.settings?.notification?.push) {
                                 const pushData = {
+                                    playerId: user?.player_id_onesignal?.toString(),
                                     userId: author._id, // FIXED: changed from recipient to author
                                     title: "Nova interação!",
-                                    body: `${req.user.name || "Alguém"} ${groupedMessage}`,
+                                    message: `${req.user.name || "Alguém"} ${groupedMessage}`,
                                     ...(existingNotification?.sender?.profile_image?.thumbnails?.push_notification && {
                                         largeIcon: existingNotification?.sender?.profile_image?.thumbnails?.push_notification
                                     })
@@ -334,11 +337,13 @@ const createComment = async (req, res) => {
 
                         // ENVIA PUSH NOTIFICATION para o usuário inativo
                         const user = await User.findById(author._id); // FIXED: changed from recipient to author
-                        if (user && user.push_subscription && user.push_subscription.enabled) {
+
+                        if (user?.player_id_onesignal && user?.settings?.notification?.push) {
                             const pushData = {
+                                playerId: user?.player_id_onesignal?.toString(),
                                 userId: author._id, // FIXED: changed from recipient to author
                                 title: "Nova interação!",
-                                body: `${req.user.name || "Alguém"} ${parentComment?._id ? "respondeu à sua resposta" : "comentou no seu post"}`,
+                                message: `${req.user.name || "Alguém"} ${parentComment?._id ? "respondeu à sua resposta" : "comentou no seu post"}`,
                                 data: {
                                     type: notificationType,
                                     postId: post._id,

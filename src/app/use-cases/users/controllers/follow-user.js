@@ -202,9 +202,10 @@ const followUser = async (req, res) => {
                             // ENVIA PUSH NOTIFICATION para o usuário inativo
                             if (userToFollow && userToFollow?.player_id_onesignal && userToFollow?.settings?.notification?.push) {
                                 const pushData = {
+                                    playerId: userToFollow?.player_id_onesignal.toString(),
                                     userId: userToFollow._id,
                                     title: "Novo seguidor!",
-                                    body: groupedMessage,
+                                    message: groupedMessage,
                                     ...(user?.profile_image?.thumbnails?.push_notification && {
                                         largeIcon: user?.profile_image?.thumbnails?.push_notification
                                     })
@@ -243,9 +244,10 @@ const followUser = async (req, res) => {
                         // ENVIA PUSH NOTIFICATION para o usuário inativo
                         if (userToFollow && userToFollow?.player_id_onesignal && userToFollow?.settings?.notification?.push) {
                             const pushData = {
+                                playerId: userToFollow?.player_id_onesignal.toString(),
                                 userId: userToFollow._id,
                                 title: "Novo seguidor!",
-                                body: `começou a seguir você.`,
+                                message: `começou a seguir você.`,
                                 data: {
                                     type: notificationType,
                                     senderId: loggedUserId
