@@ -14,7 +14,7 @@ const createComment = async (req, res) => {
         const { content, replyTo, media, parentId } = req.body;
 
         if (!postId)
-            return res.status({
+            return res.status(400).json({
                 message: "Por favor informe o id do post"
             })
 
@@ -164,7 +164,6 @@ const createComment = async (req, res) => {
                 })
                 .lean();
 
-
             const author = parentComment?._id ? parentComment?.author : post?.author;
 
             const isSameUser = author?._id.toString() === userId.toString();
@@ -242,7 +241,7 @@ const createComment = async (req, res) => {
 
                     // Verifica se já existe uma notificação similar nas últimas horas
                     let existingNotification = await Notification.findOne({
-                        recipient: recipient._id,
+                        recipient: author._id, // FIXED: changed from recipient to author
                         type: notificationType,
                         post: post._id,
                         ...(parentComment?._id && { comment: parentComment._id }), // Para replies, associa ao comentário pai
@@ -264,7 +263,7 @@ const createComment = async (req, res) => {
                             });
 
                             // Incrementa o contador de notificações não lidas
-                            await User.findByIdAndUpdate(recipient._id, {
+                            await User.findByIdAndUpdate(author._id, { // FIXED: changed from recipient to author
                                 $inc: { unread_notifications_count: 1 }
                             });
 
@@ -289,11 +288,11 @@ const createComment = async (req, res) => {
                             });
 
                             // ENVIA PUSH NOTIFICATION para o usuário inativo
-                            const user = await User.findById(recipient._id)
+                            const user = await User.findById(author._id) // FIXED: changed from recipient to author
                                 .select("player_id_onesignal profile_image settings");
                             if (user && user?.player_id_onesignal && user?.settings?.notification?.push) {
                                 const pushData = {
-                                    userId: recipient._id,
+                                    userId: author._id, // FIXED: changed from recipient to author
                                     title: "Nova interação!",
                                     body: `${req.user.name || "Alguém"} ${groupedMessage}`,
                                     ...(existingNotification?.sender?.profile_image?.thumbnails?.push_notification && {
@@ -303,7 +302,7 @@ const createComment = async (req, res) => {
 
                                 try {
                                     await sendPushNotification(pushData)
-                                    console.log(`Push notification enviada para ${recipient._id}`);
+                                    console.log(`Push notification enviada para ${author._id}`); // FIXED: changed from recipient to author
                                 } catch (pushError) {
                                     console.error("Erro ao enviar push notification:", pushError);
                                 }
@@ -312,7 +311,7 @@ const createComment = async (req, res) => {
                     } else {
                         // Cria uma nova notificação agrupada
                         const newNotification = new Notification({
-                            recipient: recipient._id,
+                            recipient: author._id, // FIXED: changed from recipient to author
                             senders: [userId],
                             sender: userId, // Mantém compatibilidade com esquema antigo
                             type: notificationType,
@@ -329,15 +328,15 @@ const createComment = async (req, res) => {
                         await newNotification.save();
 
                         // Incrementa contador de notificações não lidas
-                        await User.findByIdAndUpdate(recipient._id, {
+                        await User.findByIdAndUpdate(author._id, { // FIXED: changed from recipient to author
                             $inc: { unread_notifications_count: 1 }
                         });
 
                         // ENVIA PUSH NOTIFICATION para o usuário inativo
-                        const user = await User.findById(recipient._id);
+                        const user = await User.findById(author._id); // FIXED: changed from recipient to author
                         if (user && user.push_subscription && user.push_subscription.enabled) {
                             const pushData = {
-                                userId: recipient._id,
+                                userId: author._id, // FIXED: changed from recipient to author
                                 title: "Nova interação!",
                                 body: `${req.user.name || "Alguém"} ${parentComment?._id ? "respondeu à sua resposta" : "comentou no seu post"}`,
                                 data: {
@@ -350,7 +349,7 @@ const createComment = async (req, res) => {
 
                             try {
                                 await sendPushNotification(pushData);
-                                console.log(`Push notification enviada para ${recipient._id}`);
+                                console.log(`Push notification enviada para ${author._id}`); // FIXED: changed from recipient to author
                             } catch (pushError) {
                                 console.error("Erro ao enviar push notification:", pushError);
                             }
