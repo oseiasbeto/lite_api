@@ -10,6 +10,7 @@ const getPostsByUserId = require("./controllers/get-posts-by-user-id")
 const toggleUpvotePost = require("./controllers/toggle-upvote-post")
 const toggleDownvotePost = require("./controllers/toggle-downvote-post")
 const getPostById = require("./controllers/get-post-by-id")
+const deletePostById = require("./controllers/delete-post-by-id")
 
 
 // configurando as rotas
@@ -17,6 +18,7 @@ router.post("/", protectedRoute, createPost)
 router.get("/feed", protectedRoute, getPostsFeed)
 router.get("/user/:id", protectedRoute, getPostsByUserId)
 router.get("/:id", protectedRoute, getPostById)
+router.delete("/:id", protectedRoute, deletePostById)
 router.put("/:id/toggle-upvote", protectedRoute, toggleUpvotePost)
 router.put("/:id/toggle-downvote", protectedRoute, toggleDownvotePost)
 

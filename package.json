@@ -11,6 +11,7 @@
     "body-parser": "^1.20.3",
     "cloudinary": "^2.0.2",
     "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
     "diacritic": "^0.0.2",
     "dotenv": "^16.0.1",
     "express": "^4.17.1",
