@@ -88,33 +88,35 @@ const initializeSocket = (server) => {
             });
 
             // Quando usuário começa a digitar
-            socket.on('typing_start', async ({conv, reciverId, source}) => {
-
-                console.log(`Usuário ${userId} começou a digitar na conversa ${conv?._id}`);
+            socket.on('typing_start', async ({convId, reciverId, source}) => {
+                console.log(reciverId)
+                console.log(source)
+                console.log(`Usuário ${userId} começou a digitar na conversa ${convId}`);
 
                 socket.to(reciverId?.toString()).emit('user_typing_start', {
                     userId: userId,
-                    conv: conv,
+                    convId: convId,
                     isTyping: true,
                     source
                 });
 
-                console.log(`Emitindo typing_start para conversa ${conv?._id}`);
+                console.log(`Emitindo typing_start para conversa ${convId}`);
             });
 
             // Quando usuário para de digitar
-            socket.on('typing_stop', async ({conv, reciverId, source}) => {
+            socket.on('typing_stop', async ({convId, reciverId, source}) => {
 
-                console.log(`Usuário ${userId} parou de digitar na conversa ${conv?._id}`);
+                console.log(reciverId)
+                console.log(`Usuário ${userId} parou de digitar na conversa ${convId}`);
 
                 socket.to(reciverId?.toString()).emit('user_typing_stop', {
                     userId: userId,
-                    conv: conv,
+                    convId: convId,
                     isTyping: true,
                     source
                 });
 
-                console.log(`Emitindo typing_stop para conversa ${conv?._id}`);
+                console.log(`Emitindo typing_stop para conversa ${convId}`);
             });
 
             socket.on('disconnect', () => {
