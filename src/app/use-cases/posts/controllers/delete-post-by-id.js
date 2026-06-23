@@ -4,9 +4,9 @@ const axios = require('axios');
 const CryptoJS = require('crypto-js');
 
 // Configurações do Cloudinary (coloque no arquivo .env)
-const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
-const API_KEY = process.env.CLOUDINARY_API_KEY;
-const API_SECRET = process.env.CLOUDINARY_API_SECRET;
+const CLOUD_NAME = process.env.CLOUDINARY_NAME;
+const API_KEY = process.env.CLOUDINARY_APIKEY;
+const API_SECRET = process.env.CLOUDINARY_SECRET_KEY;
 
 /**
  * Função para deletar mídia do Cloudinary
