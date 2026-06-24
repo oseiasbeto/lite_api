@@ -45,19 +45,19 @@ const sendMessage = async (req, res) => {
       return res.status(403).json({ message: "Você não faz parte desta conversa" });
     }
 
-    const isFirstMessage = conversation?.last_message?.content === '' ? true : false
+    const isFirstMessage = conversation?.last_message?.content === '' ? true : false;
 
     const otherParticipant = isFirstMessage ? conversation.participants.find(p => p?.user?._id.toString() === senderId)
-      : conversation.participants.find(p => p?.user?._id.toString() !== senderId.toString())
+      : conversation.participants.find(p => p?.user?._id.toString() !== senderId.toString());
 
-    let originalMessageReplyTo = null
+    let originalMessageReplyTo = null;
 
     if (reply_to) {
       originalMessageReplyTo = await Message.findById(reply_to)
-        .populate('sender', 'name username profile_image is_verified activity_status')
+        .populate('sender', 'name username profile_image is_verified activity_status');
     }
 
-    // 2. Cria a mensagem (agora com conversation!)
+    // 2. Cria a mensagem
     const message = await Message.create({
       conversation: convId,
       sender: senderId,
@@ -85,45 +85,93 @@ const sendMessage = async (req, res) => {
             path: "user",
             select: 'name username profile_image is_verified is_online'
           }
-        })
-    } else populatedMessage = null
+        });
+    } else populatedMessage = null;
 
-
-    // 3. Atualiza last_message da conversa
+    // 3. Prepara o preview da mensagem
     const previewText = content ? content
       : message_type === 'photo' ? '📷 Foto'
         : message_type === 'video' ? '🎥 Vídeo'
           : message_type === 'voice' ? '🎤 Mensagem de voz'
             : message_type === 'sticker' ? '🎭 Sticker' : '[Mídia]';
 
-    conversation.last_message = {
-      msg_id: message._id,
-      sender: senderId,
-      content: previewText,
-      message_type,
-      created_at: message.created_at
+    // 4. Prepara o objeto de atualização atômica
+    const updateData = {
+      $set: {
+        'last_message': {
+          msg_id: message._id,
+          sender: senderId,
+          content: previewText,
+          message_type,
+          created_at: message.created_at
+        },
+        'read_by': []
+      }
     };
 
+    // Adiciona o unread_count do sender como 0
+    updateData.$set[`unread_count.${senderId}`] = 0;
 
+    // Prepara os incrementos para os outros participantes
+    const participantsToNotify = [];
+    const participantsToUpdate = [];
+
+    conversation.participants.forEach(participant => {
+      const userId = participant?.user?._id.toString();
+      if (userId === senderId.toString()) return;
+
+      participantsToUpdate.push(userId);
+      participantsToNotify.push({
+        userId,
+        user: participant.user,
+        isOnline: participant?.user?.is_online || false
+      });
+
+      // Incrementa unread_count para este participante
+      updateData.$inc = updateData.$inc || {};
+      updateData.$inc[`unread_count.${userId}`] = 1;
+    });
+
+    // 5. Atualiza a conversa atomicamente
+    const updatedConversation = await Conversation.findOneAndUpdate(
+      { _id: convId },
+      updateData,
+      { 
+        new: true, // Retorna o documento atualizado
+        runValidators: true
+      }
+    ).populate({
+      path: 'participants',
+      populate: {
+        path: 'user',
+        select: 'name is_verified profile_image socket_id is_online last_seen'
+      }
+    });
+
+    if (!updatedConversation) {
+      return res.status(404).json({ message: "Conversa não encontrada ao atualizar" });
+    }
+
+    // 6. Prepara a mensagem para enviar aos clientes
     const messageToSend = {
       _id: populatedMessage._id,
       conversation: {
-        _id: conversation._id,
-        type: conversation.type,
-        name: conversation.type === 'direct' ? otherParticipant?.user?.name || 'Usuário' : conversation.name,
-        avatar: conversation.type === 'direct' ? otherParticipant?.user?.profile_image?.url : conversation.avatar,
-        is_online: conversation.type === 'direct' ? otherParticipant?.user?.is_online : false,
-        last_seen: conversation.type === 'direct' ? otherParticipant?.user?.last_seen : null,
-        last_message: conversation.last_message ? {
-          content: conversation.last_message.content || '[Foto]',
-          created_at: conversation.last_message.created_at
+        _id: updatedConversation._id,
+        type: updatedConversation.type,
+        name: updatedConversation.type === 'direct' ? otherParticipant?.user?.name || 'Usuário' : updatedConversation.name,
+        avatar: updatedConversation.type === 'direct' ? otherParticipant?.user?.profile_image?.url : updatedConversation.avatar,
+        is_online: updatedConversation.type === 'direct' ? otherParticipant?.user?.is_online : false,
+        last_seen: updatedConversation.type === 'direct' ? otherParticipant?.user?.last_seen : null,
+        last_message: updatedConversation.last_message ? {
+          content: updatedConversation.last_message.content || '[Foto]',
+          created_at: updatedConversation.last_message.created_at
         } : null,
-        participants: conversation.participants || [],
-        read_by: conversation.read_by || [],
-        archived_by: conversation.archived_by || [],
-        deleted_by: conversation.deleted_by || [],
-        pinned: conversation.pinned,
-        muted: !!conversation.muted_until
+        participants: updatedConversation.participants || [],
+        read_by: updatedConversation.read_by || [],
+        archived_by: updatedConversation.archived_by || [],
+        deleted_by: updatedConversation.deleted_by || [],
+        pinned: updatedConversation.pinned,
+        muted: !!updatedConversation.muted_until
       },
       sender: {
         _id: populatedMessage?.sender?._id,
@@ -146,38 +194,34 @@ const sendMessage = async (req, res) => {
       reply_to: originalMessageReplyTo ? originalMessageReplyTo : null
     };
 
-    conversation.participants.forEach(async participant => {
-      if (participant?.user?._id.toString() === senderId.toString()) return;
+    // 7. Notifica os participantes e atualiza contadores de forma assíncrona
+    const notificationPromises = [];
 
-      const current = conversation.unread_count.get(participant?.user?._id.toString()) || 0;
-      conversation.unread_count.set(participant?.user?._id.toString(), current + 1);
+    for (const participant of participantsToNotify) {
+      // Atualiza o contador de mensagens não lidas do usuário
+      notificationPromises.push(
+        User.updateOne(
+          { _id: participant.userId },
+          { $inc: { unread_messages_count: 1 } }
+        )
+      );
 
-      if (participant?.user?.is_online) {
-        emitToUser(participant?.user?._id.toString(), 'new_message', messageToSend)
+      // Envia a mensagem em tempo real se estiver online
+      if (participant.isOnline) {
+        emitToUser(participant.userId, 'new_message', messageToSend);
       } else {
-        // [TODO] Enviar push notification
+        // Envia push notification (se implementado)
+        // await sendPushNotification(participant.userId, messageToSend);
+        // [TODO] Implementar push notification
       }
+    }
 
-      await User.updateOne({
-        _id: participant?.user?._id
-      }, {
-        $inc: {
-          unread_messages_count: 1
-        }
-      })
-    });
-
-    conversation.unread_count.set(senderId, 0);
-
-    conversation.read_by = []
-
-    await conversation.save();
+    // Aguarda todas as atualizações de contador (não bloqueia a resposta)
+    await Promise.all(notificationPromises);
 
     return res.status(201).json({
       message: "Mensagem enviada com sucesso",
-      data: {
-        ...messageToSend
-      }
+      data: messageToSend
     });
 
   } catch (error) {

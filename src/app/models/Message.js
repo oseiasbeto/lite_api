@@ -8,7 +8,6 @@ const messageSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-
   // Conteúdo da mensagem
   content: { type: String },
 
@@ -61,6 +60,7 @@ const messageSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     read_at: { type: Date, default: Date.now }
   }],
+  
   deleted_for: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   reactions: [{
     emoji: String,
