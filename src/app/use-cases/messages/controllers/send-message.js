@@ -249,12 +249,12 @@ const sendMessage = async (req, res) => {
       }
     }
 
-    await Promise.all(notificationPromises);
-
-    return res.status(201).json({
+    res.status(201).json({
       message: "Mensagem enviada com sucesso",
       data: messageToSend
     });
+
+    await Promise.all(notificationPromises);
 
   } catch (error) {
     console.error("Erro ao enviar mensagem:", error);
