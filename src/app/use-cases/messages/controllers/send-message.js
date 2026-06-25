@@ -89,7 +89,7 @@ const sendMessage = async (req, res) => {
       populatedMessage = await Message.findById(message._id)
         .populate({
           path: 'sender',
-          select: 'name username profile_image.url is_online is_verified'
+          select: 'name username profile_image is_online is_verified'
         })
         .populate({
           path: "reactions",
@@ -221,11 +221,12 @@ const sendMessage = async (req, res) => {
       const hasPushToken = !!participant.user?.player_id_onesignal;
 
       if (notificationsEnabled && hasPushToken) {
+
         const basePushData = {
           playerId: participant.user.player_id_onesignal.toString(),
           userId: participant.userId,
-          ...(participant?.user?.profile_image?.thumbnails?.push_notification && {
-            largeIcon: participant.user.profile_image.thumbnails.push_notification
+          ...(populatedMessage?.sender?.profile_image?.thumbnails?.push_notification && {
+            largeIcon: populatedMessage?.sender?.profile_image?.thumbnails?.push_notification
           }),
           data: {
             type: 'new_message',
