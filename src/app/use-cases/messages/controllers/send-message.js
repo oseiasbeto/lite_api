@@ -4,15 +4,30 @@ const Conversation = require('../../../models/Conversation')
 const User = require('../../../models/User')
 const { emitToUser } = require("../../../services/socket");
 const sendPushNotification = require("../../../services/send-push-notification");
+const { scheduleGroupedPush } = require("../../../services/notification-debouncer");
 
 const MAX_VOICE_DURATION = 60; // segundos
+
+const buildMessagePreview = (senderName, message_type, content) => {
+  switch (message_type) {
+    case 'photo':
+      return `${senderName} enviou uma foto`;
+    case 'video':
+      return `${senderName} enviou um vídeo`;
+    case 'voice':
+      return `${senderName} enviou uma mensagem de voz`;
+    case 'sticker':
+      return `${senderName} enviou um sticker`;
+    default:
+      return content?.length > 100 ? `${content.substring(0, 100)}…` : (content || `${senderName} enviou uma mensagem`);
+  }
+};
 
 const sendMessage = async (req, res) => {
   try {
     const { convId, content, source, message_type = 'text', reply_to, file_url, file_thumb, file_duration, file_size } = req.body;
     const senderId = req.user.id;
 
-    // Validação simples pra voz (não interfere no resto)
     if (message_type === 'voice') {
       if (!file_url) {
         return res.status(400).json({ message: "URL do áudio é obrigatória" });
@@ -22,13 +37,12 @@ const sendMessage = async (req, res) => {
       }
     }
 
-    // 1. Busca a conversa + participantes com socket_id
     const conversation = await Conversation.findById(convId)
       .populate({
         path: 'participants',
         populate: {
           path: 'user',
-          select: 'name is_verified profile_image socket_id is_online last_seen'
+          select: 'name is_verified profile_image socket_id is_online last_seen player_id_onesignal notification_settings'
         }
       });
 
@@ -36,7 +50,6 @@ const sendMessage = async (req, res) => {
       return res.status(404).json({ message: "Conversa não encontrada" });
     }
 
-    // Verifica se o usuário está na conversa
     const senderInConversation = conversation.participants.some(
       p => p?.user?._id.toString() === senderId.toString()
     );
@@ -57,7 +70,6 @@ const sendMessage = async (req, res) => {
         .populate('sender', 'name username profile_image is_verified activity_status');
     }
 
-    // 2. Cria a mensagem
     const message = await Message.create({
       conversation: convId,
       sender: senderId,
@@ -88,14 +100,12 @@ const sendMessage = async (req, res) => {
         });
     } else populatedMessage = null;
 
-    // 3. Prepara o preview da mensagem
     const previewText = content ? content
       : message_type === 'photo' ? '📷 Foto'
         : message_type === 'video' ? '🎥 Vídeo'
           : message_type === 'voice' ? '🎤 Mensagem de voz'
             : message_type === 'sticker' ? '🎭 Sticker' : '[Mídia]';
 
-    // 4. Prepara o objeto de atualização atômica
     const updateData = {
       $set: {
         'last_message': {
@@ -109,37 +119,28 @@ const sendMessage = async (req, res) => {
       }
     };
 
-    // Adiciona o unread_count do sender como 0
     updateData.$set[`unread_count.${senderId}`] = 0;
 
-    // Prepara os incrementos para os outros participantes
     const participantsToNotify = [];
-    const participantsToUpdate = [];
 
     conversation.participants.forEach(participant => {
       const userId = participant?.user?._id.toString();
       if (userId === senderId.toString()) return;
 
-      participantsToUpdate.push(userId);
       participantsToNotify.push({
         userId,
         user: participant.user,
         isOnline: participant?.user?.is_online || false
       });
 
-      // Incrementa unread_count para este participante
       updateData.$inc = updateData.$inc || {};
       updateData.$inc[`unread_count.${userId}`] = 1;
     });
 
-    // 5. Atualiza a conversa atomicamente
     const updatedConversation = await Conversation.findOneAndUpdate(
       { _id: convId },
       updateData,
-      { 
-        new: true, // Retorna o documento atualizado
-        runValidators: true
-      }
+      { new: true, runValidators: true }
     ).populate({
       path: 'participants',
       populate: {
@@ -152,7 +153,6 @@ const sendMessage = async (req, res) => {
       return res.status(404).json({ message: "Conversa não encontrada ao atualizar" });
     }
 
-    // 6. Prepara a mensagem para enviar aos clientes
     const messageToSend = {
       _id: populatedMessage._id,
       conversation: {
@@ -194,11 +194,17 @@ const sendMessage = async (req, res) => {
       reply_to: originalMessageReplyTo ? originalMessageReplyTo : null
     };
 
-    // 7. Notifica os participantes e atualiza contadores de forma assíncrona
+    // 7. Notifica os participantes
     const notificationPromises = [];
 
+    const senderName = populatedMessage?.sender?.name || 'Alguém';
+    const messagePreview = buildMessagePreview(senderName, message_type, populatedMessage.content);
+    const isGroupConversation = updatedConversation.type !== 'direct';
+    const convTitle = isGroupConversation
+      ? (updatedConversation.name || 'Grupo')
+      : senderName;
+
     for (const participant of participantsToNotify) {
-      // Atualiza o contador de mensagens não lidas do usuário
       notificationPromises.push(
         User.updateOne(
           { _id: participant.userId },
@@ -206,17 +212,42 @@ const sendMessage = async (req, res) => {
         )
       );
 
-      // Envia a mensagem em tempo real se estiver online
       if (participant.isOnline) {
         emitToUser(participant.userId, 'new_message', messageToSend);
-      } else {
-        // Envia push notification (se implementado)
-        // await sendPushNotification(participant.userId, messageToSend);
-        // [TODO] Implementar push notification
+        continue;
+      }
+
+      const notificationsEnabled = participant.user?.notification_settings?.messages !== false;
+      const hasPushToken = !!participant.user?.player_id_onesignal;
+
+      if (notificationsEnabled && hasPushToken) {
+        const basePushData = {
+          playerId: participant.user.player_id_onesignal.toString(),
+          userId: participant.userId,
+          ...(participant?.user?.profile_image?.thumbnails?.push_notification && {
+            largeIcon: participant.user.profile_image.thumbnails.push_notification
+          }),
+          data: {
+            type: 'new_message',
+            source
+          }
+        };
+
+        // Em vez de enviar direto, agenda no debouncer —
+        // ele decide sozinho se manda já, agrupado, ou espera mais um pouco
+        scheduleGroupedPush({
+          userId: participant.userId,
+          convId: updatedConversation._id.toString(),
+          convTitle,
+          senderName,
+          messagePreview,
+          isGroup: isGroupConversation,
+          basePushData,
+          sendFn: sendPushNotification
+        });
       }
     }
 
-    // Aguarda todas as atualizações de contador (não bloqueia a resposta)
     await Promise.all(notificationPromises);
 
     return res.status(201).json({

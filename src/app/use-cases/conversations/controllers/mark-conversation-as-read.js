@@ -3,6 +3,7 @@ const Conversation = require('../../../models/Conversation');
 const Message = require('../../../models/Message');
 const User = require('../../../models/User');
 const { emitToUser } = require("../../../services/socket");
+const { cancelPending } = require("../../../services/notification-debouncer");
 
 // Controlador para obter mensagens de uma conversa específica
 const markConversationAsRead = async (req, res) => {
@@ -85,6 +86,9 @@ const markConversationAsRead = async (req, res) => {
         }
 
         await conversation.save();
+
+        // Cancela qualquer push agrupado pendente para esta conversa
+        cancelPending(userId, convId);
 
         return res.json({
             success: true,
