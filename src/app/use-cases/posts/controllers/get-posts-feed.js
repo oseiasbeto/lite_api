@@ -30,7 +30,7 @@ const getPostsFeed = async (req, res) => {
       })
       .populate(
         "author",
-        "name verified is_online is_verified followers profile_image credentials location"
+        "name verified is_online is_verified username followers profile_image credentials location"
       ) // Popula username e profile_picture
       .populate({
         path: "shared_post",
@@ -38,7 +38,7 @@ const getPostsFeed = async (req, res) => {
           {
             path: "author",
             select:
-              "name verified is_verified is_online followers profile_image credentials location",
+              "name verified is_verified is_online followers profile_image credentials username location",
           },
           {
             path: "media",

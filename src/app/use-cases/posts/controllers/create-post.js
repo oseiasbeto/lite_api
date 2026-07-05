@@ -50,7 +50,7 @@ const createPost = async (req, res) => {
         })
         .populate(
           "author",
-          "name is_verified credentials is_online profile_image"
+          "name is_verified credentials is_online profile_image username"
         )
       if (!sharedPostDoc) {
         return res.status(404).json({
@@ -141,14 +141,14 @@ const createPost = async (req, res) => {
       const populatedPost = await Post.findById(newPost._id)
         .populate(
           "author",
-          "name is_verified credentials is_online profile_image unread_notifications_count"
+          "name is_verified credentials is_online profile_image username unread_notifications_count"
         )
         .populate({
           path: "shared_post",
           populate: [
             {
               path: "author",
-              select: "name is_verified credentials is_online profile_image unread_notifications_count"
+              select: "name is_verified credentials is_online profile_image username unread_notifications_count"
             },
             {
               path: "media",
