@@ -41,10 +41,10 @@ const getCommentsByPostId = async (req, res) => {
                     from: 'comments',
                     let: { commentId: '$_id' },
                     pipeline: [
-                        { 
-                            $match: { 
-                                $expr: { $eq: ['$parent', '$$commentId'] } 
-                            } 
+                        {
+                            $match: {
+                                $expr: { $eq: ['$parent', '$$commentId'] }
+                            }
                         },
                         { $limit: 3 },
                         {
@@ -61,6 +61,21 @@ const getCommentsByPostId = async (req, res) => {
                                 preserveNullAndEmptyArrays: true
                             }
                         },
+                        // 🔥 POPULA O reply_to (autor original a quem esta resposta foi dirigida) 🔥
+                        {
+                            $lookup: {
+                                from: 'users',
+                                localField: 'reply_to',
+                                foreignField: '_id',
+                                as: 'reply_to'
+                            }
+                        },
+                        {
+                            $unwind: {
+                                path: '$reply_to',
+                                preserveNullAndEmptyArrays: true
+                            }
+                        },
                         {
                             $project: {
                                 _id: 1,
@@ -72,7 +87,19 @@ const getCommentsByPostId = async (req, res) => {
                                 downvotes_count: 1,
                                 replies_count: 1,
                                 created_at: 1,
-                                reply_to: 1,
+                                reply_to: {
+                                    $cond: {
+                                        if: { $ifNull: ['$reply_to', false] },
+                                        then: {
+                                            _id: '$reply_to._id',
+                                            name: '$reply_to.name',
+                                            username: '$reply_to.username',
+                                            is_verified: '$reply_to.is_verified',
+                                            profile_image: '$reply_to.profile_image'
+                                        },
+                                        else: null
+                                    }
+                                },
                                 author: {
                                     $cond: {
                                         if: { $ifNull: ['$author', false] },
@@ -146,6 +173,7 @@ const getCommentsByPostId = async (req, res) => {
                                 downvotes_count: '$$reply.downvotes_count',
                                 replies_count: '$$reply.replies_count',
                                 created_at: '$$reply.created_at',
+                                // ja vem populado do pipeline aninhado acima, so repassa
                                 reply_to: '$$reply.reply_to',
                                 author: '$$reply.author'
                             }
@@ -169,18 +197,18 @@ const getCommentsByPostId = async (req, res) => {
         // 🔥 LÓGICA DE ORDENAÇÃO PRIORITÁRIA 🔥
         if (sortCommentId && mongoose.Types.ObjectId.isValid(sortCommentId)) {
             const targetCommentId = mongoose.Types.ObjectId(sortCommentId);
-            
+
             // Encontra o comentário prioritário
             const priorityComment = comments.find(
                 comment => comment._id.toString() === targetCommentId.toString()
             );
-            
+
             if (priorityComment) {
                 // Remove o comentário prioritário da lista
                 comments = comments.filter(
                     comment => comment._id.toString() !== targetCommentId.toString()
                 );
-                
+
                 // Ordena os comentários restantes pelo critério padrão
                 comments.sort((a, b) => {
                     if (sortBy === 'recents') {
@@ -191,7 +219,7 @@ const getCommentsByPostId = async (req, res) => {
                     }
                     return 0;
                 });
-                
+
                 // Coloca o comentário prioritário no início
                 comments = [priorityComment, ...comments];
             }

@@ -58,10 +58,13 @@ const sendMessage = async (req, res) => {
       return res.status(403).json({ message: "Você não faz parte desta conversa" });
     }
 
-    const isFirstMessage = conversation?.last_message?.content === '' ? true : false;
-
-    const otherParticipant = isFirstMessage ? conversation.participants.find(p => p?.user?._id.toString() === senderId)
-      : conversation.participants.find(p => p?.user?._id.toString() !== senderId.toString());
+    // --- CORREÇÃO: Seleciona o outro participante de forma direta e segura ---
+    // Para conversas diretas, sempre será o participante que não é o remetente.
+    // Para grupos, essa variável não é usada para nome/avatar (usa os dados do grupo).
+    const otherParticipant = conversation.participants.find(
+      p => p?.user?._id.toString() !== senderId.toString()
+    );
+    // --- FIM DA CORREÇÃO ---
 
     let originalMessageReplyTo = null;
 
