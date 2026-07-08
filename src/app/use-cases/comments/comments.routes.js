@@ -9,7 +9,8 @@ const getCommentsByPostId = require("./controllers/get-comments-by-post-id")
 const toggleUpvoteComment = require("./controllers/toggle-upvote-comment")
 const toggleDownvoteComment = require("./controllers/toggle-downvote-comment")
 const getCommentsByParentId = require("./controllers/get-comments-by-parent-id")
-//const deleteComment = require("../../brush/comments/delete-comment")
+const deleteComment = require("./controllers/delete-comment")
+const editComment = require("./controllers/edit-comment")
 
 // configurando as rotas
 router.post("/:id", protectedRoute, createComment)
@@ -17,8 +18,8 @@ router.get("/:id", protectedRoute, getCommentsByPostId)
 router.get("/replies/:id", protectedRoute, getCommentsByParentId)
 router.put("/:postId/:commentId/toggle-upvote", protectedRoute, toggleUpvoteComment)
 router.put("/:postId/:commentId/toggle-downvote", protectedRoute, toggleDownvoteComment)
-
-//router.delete("/:id", protectedRoute, deleteComment)
+router.put("/:id", protectedRoute, editComment)
+router.delete("/:id", protectedRoute, deleteComment)
 
 // exportando as rotas
 module.exports = router
