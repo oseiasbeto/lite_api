@@ -1,4 +1,5 @@
 const Post = require("../../../models/Post");
+const User = require("../../../models/User");
 
 /**
  * Busca todas as notificações do usuário logado com paginação.
@@ -12,11 +13,17 @@ const getPostsFeed = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10; // Limite por página (padrão: 10)
     const skip = (page - 1) * limit; // Quantidade de documentos a pular
     const hasTotal = parseInt(req.query.total) || 0; // Limite por página (padrão: 10)
+    const feedType = req.query.type || "foryou"; // 'foryou' | 'following'
 
-    const filters = {
-      type: {
-        $ne: "question"
-      }
+  
+    const filters = {}
+
+    // só mostra posts de quem o usuário segue, em ordem cronológica.
+    if (feedType === "following") {
+      const currentUser = await User.findById(userId).select("following").lean();
+      const followingIds = currentUser?.following || [];
+
+      filters.author = { $in: followingIds };
     }
 
     // Busca notificações com paginação, ordenadas por created_at (descendente)
