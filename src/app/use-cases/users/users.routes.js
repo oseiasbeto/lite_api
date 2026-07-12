@@ -7,6 +7,7 @@ const protectedRoute = require("../../middlewares/protected-route")
 // configurando as rotas
 router.get("/new-message", protectedRoute, require("./controllers/get-users-for-new-messages"))
 router.get("/search", protectedRoute, require("./controllers/search-users"))
+router.get("/suggestions", protectedRoute, require("./controllers/get-user-suggestions"))
 router.put("/:user_id/follow", protectedRoute, require("./controllers/follow-user"))
 router.put("/:user_id/subscribe", protectedRoute, require("./controllers/subscribe-user"))
 router.get("/:id", protectedRoute, require("./controllers/get-user-by-id"))

@@ -5,8 +5,7 @@ const User = require("../../../models/User");
 const forceOffline = async (req, res) => {
     try {
         const { id } = req.params;
-
-        console.log("acionou o force")
+        
         // Verifica se o token foi enviado na requisição
         if (!id) {
             return res.status(400).json({ message: "O id e obrigatorio." });
