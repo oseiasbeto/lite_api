@@ -130,10 +130,13 @@ const post = new mongoose.Schema(
 );
 
 // Índices para melhorar performance nas buscas
-post.index({ question: 'text', content: 'text', topics: 'text' });
-post.index({ type: 1, created_at: -1 });
-post.index({ author: 1, type: 1 });
-post.index({ shared_post: 1, created_at: -1 })
+// Índices para melhorar performance nas buscas
+post.index({ content: 'text', topics: 'text' }); // removido "question", que não existe no schema
+post.index({ created_at: -1 });                   // feed "foryou"
+post.index({ author: 1, created_at: -1 });        // feed "following"
+post.index({ status: 1, created_at: -1 });        // feed "trending" (e reforça foryou/following se 
+post.index({ shared_post: 1, created_at: -1 });   // já existia, mantido
+
 
 const Post = mongoose.model("Post", post);
 
