@@ -28,6 +28,8 @@ const sendMessage = async (req, res) => {
     const { convId, content, source, message_type = 'text', reply_to, file_url, file_thumb, file_duration, file_size } = req.body;
     const senderId = req.user.id;
 
+    console.log(req.body)
+
     if (message_type === 'voice') {
       if (!file_url) {
         return res.status(400).json({ message: "URL do áudio é obrigatória" });
