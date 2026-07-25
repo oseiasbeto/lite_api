@@ -14,7 +14,7 @@ const messageSchema = new mongoose.Schema({
   // Tipo de mensagem (igual Telegram)
   message_type: {
     type: String,
-    enum: ['text', 'photo', 'video', 'reaction_message', 'deleted_message', 'voice', 'document', 'sticker', 'contact', 'location', 'poll'],
+    enum: ['text', 'photo', 'video', 'reaction_message', 'deleted_message', 'voice', 'document', 'sticker', 'gif', 'contact', 'location', 'poll'],
     default: 'text'
   },
 

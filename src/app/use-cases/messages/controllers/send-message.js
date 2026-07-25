@@ -34,9 +34,6 @@ const sendMessage = async (req, res) => {
       if (!file_url) {
         return res.status(400).json({ message: "URL do áudio é obrigatória" });
       }
-      if (file_duration && file_duration > MAX_VOICE_DURATION) {
-        return res.status(400).json({ message: "Áudio excede o limite de 1 minuto" });
-      }
     }
 
     const conversation = await Conversation.findById(convId)
@@ -106,9 +103,10 @@ const sendMessage = async (req, res) => {
     } else populatedMessage = null;
 
     const previewText = content ? content
-      : message_type === 'photo' ? '📷 Foto'
-        : message_type === 'video' ? '🎥 Vídeo'
-          : message_type === 'voice' ? '🎤 Mensagem de voz'
+      : message_type === 'photo' ? 'Foto'
+        : message_type === 'video' ? 'Vídeo'
+          : message_type === 'voice' ? 'Mensagem de voz'
+          : message_type === 'gif' ? 'GIF'
             : message_type === 'sticker' ? '🎭 Sticker' : '[Mídia]';
 
     const updateData = {
