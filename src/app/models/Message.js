@@ -29,6 +29,8 @@ const messageSchema = new mongoose.Schema({
   file_thumb: String,
   file_duration: String,
   file_size: String,
+  file_width: String,
+  file_height: String,
   
   // Reply (responder mensagem)
   reply_to: {

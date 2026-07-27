@@ -25,7 +25,7 @@ const buildMessagePreview = (senderName, message_type, content) => {
 
 const sendMessage = async (req, res) => {
   try {
-    const { convId, content, source, message_type = 'text', reply_to, file_url, file_thumb, file_duration, file_size } = req.body;
+    const { convId, content, source, message_type = 'text', reply_to, file_url, file_thumb, file_duration, file_size, file_width, file_height } = req.body;
     const senderId = req.user.id;
 
     console.log(req.body)
@@ -80,6 +80,8 @@ const sendMessage = async (req, res) => {
       file_url,
       file_thumb,
       file_duration,
+      file_width, 
+      file_height,
       file_size,
       ...(originalMessageReplyTo && {
         reply_to: originalMessageReplyTo?._id
