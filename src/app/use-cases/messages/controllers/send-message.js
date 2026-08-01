@@ -195,6 +195,8 @@ const sendMessage = async (req, res) => {
       file_url: populatedMessage.file_url,
       file_thumb: populatedMessage.file_thumb,
       file_duration: populatedMessage.file_duration,
+      file_height: populatedMessage.file_height,
+      file_width: populatedMessage.file_width,
       created_at: populatedMessage.created_at,
       reply_to: originalMessageReplyTo ? originalMessageReplyTo : null
     };
