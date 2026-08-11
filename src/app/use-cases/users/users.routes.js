@@ -11,6 +11,8 @@ router.get("/suggestions", protectedRoute, require("./controllers/get-user-sugge
 router.put("/:user_id/follow", protectedRoute, require("./controllers/follow-user"))
 router.put("/:user_id/subscribe", protectedRoute, require("./controllers/subscribe-user"))
 router.get("/:id", protectedRoute, require("./controllers/get-user-by-id"))
+router.get("/:user_id/following", protectedRoute, require("./controllers/get-user-following"))
+router.get("/:user_id/followers", protectedRoute, require("./controllers/get-user-followers"))
 router.post("/force-offline/:id", protectedRoute, require("./controllers/force-offline"))
 router.put("/", protectedRoute, require("./controllers/update-user-by-id"))
 router.put("/unread-messages-count", protectedRoute, require("./controllers/update-unread-messages-count"))
