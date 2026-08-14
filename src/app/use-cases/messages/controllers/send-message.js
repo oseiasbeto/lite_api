@@ -13,7 +13,7 @@ const buildMessagePreview = (senderName, message_type, content) => {
     case 'photo':
       return `${senderName} enviou uma foto`;
     case 'video':
-      return `${senderName} enviou um vídeo`;
+      return `${senderName} enviou uma vídeo`;
     case 'voice':
       return `${senderName} enviou uma mensagem de voz`;
     case 'sticker':
@@ -27,8 +27,6 @@ const sendMessage = async (req, res) => {
   try {
     const { convId, content, source, message_type = 'text', reply_to, file_url, file_thumb, file_duration, file_size, file_width, file_height } = req.body;
     const senderId = req.user.id;
-
-    console.log(req.body)
 
     if (message_type === 'voice') {
       if (!file_url) {
@@ -57,19 +55,23 @@ const sendMessage = async (req, res) => {
       return res.status(403).json({ message: "Você não faz parte desta conversa" });
     }
 
-    // --- CORREÇÃO: Seleciona o outro participante de forma direta e segura ---
-    // Para conversas diretas, sempre será o participante que não é o remetente.
-    // Para grupos, essa variável não é usada para nome/avatar (usa os dados do grupo).
+    // Do ponto de vista do REMETENTE, "otherParticipant" é o destinatário.
+    // Isso é usado apenas para montar a resposta HTTP que volta pro próprio remetente.
+    // NÃO deve ser reaproveitado para montar o payload emitido via socket para o
+    // destinatário — nesse caso, é preciso usar os dados do REMETENTE.
     const otherParticipant = conversation.participants.find(
       p => p?.user?._id.toString() !== senderId.toString()
     );
-    // --- FIM DA CORREÇÃO ---
 
     let originalMessageReplyTo = null;
 
     if (reply_to) {
-      originalMessageReplyTo = await Message.findById(reply_to)
-        .populate('sender', 'name username profile_image is_verified activity_status');
+      // FIX: garante que a mensagem referenciada em reply_to pertence à MESMA
+      // conversa (convId), evitando IDOR / vazamento de conteúdo de outras conversas.
+      originalMessageReplyTo = await Message.findOne({
+        _id: reply_to,
+        conversation: convId
+      }).populate('sender', 'name username profile_image is_verified activity_status');
     }
 
     const message = await Message.create({
@@ -158,6 +160,9 @@ const sendMessage = async (req, res) => {
       return res.status(404).json({ message: "Conversa não encontrada ao atualizar" });
     }
 
+    // Payload "canônico" — usado como resposta HTTP para o REMETENTE.
+    // Aqui "otherParticipant" (o destinatário) está correto, pois é isso
+    // que o remetente precisa ver como cabeçalho da conversa.
     const messageToSend = {
       _id: populatedMessage._id,
       conversation: {
@@ -220,7 +225,29 @@ const sendMessage = async (req, res) => {
       );
 
       if (participant.isOnline) {
-        emitToUser(participant.userId, 'new_message', messageToSend);
+        // FIX: para cada destinatário, o "outro lado" da conversa é o REMETENTE
+        // (numa conversa direct), não o próprio destinatário. Por isso não
+        // reaproveitamos messageToSend.conversation diretamente aqui.
+        const personalizedMessage = {
+          ...messageToSend,
+          conversation: {
+            ...messageToSend.conversation,
+            name: updatedConversation.type === 'direct'
+              ? senderName
+              : updatedConversation.name,
+            avatar: updatedConversation.type === 'direct'
+              ? populatedMessage?.sender?.profile_image?.url
+              : updatedConversation.avatar,
+            is_online: updatedConversation.type === 'direct'
+              ? populatedMessage?.sender?.is_online
+              : false,
+            last_seen: updatedConversation.type === 'direct'
+              ? populatedMessage?.sender?.last_seen
+              : null,
+          }
+        };
+
+        emitToUser(participant.userId, 'new_message', personalizedMessage);
         continue;
       }
 
