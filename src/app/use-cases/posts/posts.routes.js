@@ -16,6 +16,7 @@ const deletePostById = require("./controllers/delete-post-by-id")
 // configurando as rotas
 router.post("/", protectedRoute, createPost)
 router.get("/feed", protectedRoute, getPostsFeed)
+router.get("/reels", protectedRoute, require("./controllers/get-reels-feed"))
 router.get("/user/:id", protectedRoute, getPostsByUserId)
 router.get("/:id", protectedRoute, getPostById)
 router.delete("/:id", protectedRoute, deletePostById)
