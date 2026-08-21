@@ -20,6 +20,7 @@ const terminateAllSessions = require("./controllers/terminate-all-sessions")
 
 // configurando as rotas
 router.post("/login", login)
+router.post("/login/google", require("./controllers/auth-google"))
 router.post("/register", register)
 router.put("/register/complete", completeRegistration)
 router.post("/verify-email", verifyEmail)
