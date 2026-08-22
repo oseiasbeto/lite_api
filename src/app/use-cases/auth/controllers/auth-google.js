@@ -14,6 +14,7 @@ const authGoogle = async (req, res) => {
   try {
     const { accessToken, userId } = req.body;
 
+    console.log(req.body)
     // 1. Validação básica do payload
     if (!accessToken || !userId) {
       return res.status(400).json({
