@@ -16,7 +16,7 @@ const authGoogle = async (req, res) => {
 
     console.log(req.body)
     // 1. Validação básica do payload
-    if (!idToken || !userId) {
+    if (!idToken) {
       return res.status(400).json({
         success: false,
         message: 'idToken e obrigatórios.'
@@ -38,6 +38,8 @@ const authGoogle = async (req, res) => {
         message: 'Token do Google inválido ou expirado.'
       });
     }
+
+    console.log(googleProfile)
 
     const userId = googleProfile.sub; // Google user ID
 
