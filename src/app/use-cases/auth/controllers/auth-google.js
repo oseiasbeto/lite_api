@@ -5,31 +5,31 @@ const moment = require('moment');
 const User = require('../../../models/User'); // ajuste o caminho conforme sua estrutura
 const Session = require('../../../models/Session');
 
-const generateAccessToken = require('../../../utils/generate-access-token');
+const generateidToken = require('../../../utils/generate-access-token');
 const generateRefreshToken = require('../../../utils/generate-refresh-token');
 const encryptRefreshToken = require('../../../utils/encrypt-refresh-token');
 const generateUniqueUsername = require('../../../utils/generate-unique-username');
 
 const authGoogle = async (req, res) => {
   try {
-    const { accessToken, userId } = req.body;
+    const { idToken } = req.body;
 
     console.log(req.body)
     // 1. Validação básica do payload
-    if (!accessToken || !userId) {
+    if (!idToken || !userId) {
       return res.status(400).json({
         success: false,
-        message: 'accessToken e userId são obrigatórios.'
+        message: 'idToken e obrigatórios.'
       });
     }
 
     // 2. Verifica o token DIRETO com o Google.
     //    Nunca confie apenas nos dados que o client mandou no body —
-    //    accessToken/userId podem ser forjados sem essa checagem.
+    //    idToken/userId podem ser forjados sem essa checagem.
     let googleProfile;
     try {
       const { data } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-        params: { access_token: accessToken }
+        params: { access_token: idToken }
       });
       googleProfile = data; // { sub, email, email_verified, name, picture, ... }
     } catch (err) {
@@ -39,13 +39,7 @@ const authGoogle = async (req, res) => {
       });
     }
 
-    // 3. Garante que o id retornado pelo Google (sub) bate com o userId enviado
-    if (String(googleProfile.sub) !== String(userId)) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token não corresponde ao usuário informado.'
-      });
-    }
+    const userId = googleProfile.sub; // Google user ID
 
     const email = googleProfile.email ? googleProfile.email.toLowerCase().trim() : null;
 
@@ -100,7 +94,7 @@ const authGoogle = async (req, res) => {
     }
 
     // 7. Login bem-sucedido → cria sessão e tokens (igual ao login normal)
-    const newAccessToken = generateAccessToken(user, '30d');
+    const newidToken = generateidToken(user, '30d');
     const refreshToken = generateRefreshToken(user, '1y');
     const encrypted = encryptRefreshToken(refreshToken);
 
@@ -128,7 +122,7 @@ const authGoogle = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Login realizado com sucesso',
-      access_token: newAccessToken,
+      access_token: newidToken,
       session_id: session.id.toString(),
       user
     });
