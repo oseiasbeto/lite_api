@@ -1,5 +1,5 @@
 // controllers/auth/authGoogle.js
-const axios = require('axios');
+const { OAuth2Client } = require('google-auth-library');
 const moment = require('moment');
 
 const User = require('../../../models/User'); // ajuste o caminho conforme sua estrutura
@@ -10,39 +10,53 @@ const generateRefreshToken = require('../../../utils/generate-refresh-token');
 const encryptRefreshToken = require('../../../utils/encrypt-refresh-token');
 const generateUniqueUsername = require('../../../utils/generate-unique-username');
 
+// Client ID do Google Cloud Console (mesmo usado no frontend/app para gerar o idToken).
+// Se você tem apps diferentes (web, iOS, Android) com client IDs diferentes,
+// GOOGLE_CLIENT_IDS pode ser uma lista separada por vírgula no .env.
+const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
+
+const googleClient = new OAuth2Client();
+
 const authGoogle = async (req, res) => {
   try {
     const { idToken } = req.body;
 
-    console.log(req.body)
     // 1. Validação básica do payload
     if (!idToken) {
       return res.status(400).json({
         success: false,
-        message: 'idToken e obrigatórios.'
+        message: 'idToken é obrigatório.'
       });
     }
 
-    // 2. Verifica o token DIRETO com o Google.
-    //    Nunca confie apenas nos dados que o client mandou no body —
-    //    idToken/userId podem ser forjados sem essa checagem.
+    if (GOOGLE_CLIENT_IDS.length === 0) {
+      console.error('GOOGLE_CLIENT_ID(S) não configurado no .env');
+      return res.status(500).json({
+        success: false,
+        message: 'Erro interno no servidor.'
+      });
+    }
+
+    // 2. Verifica o idToken (JWT) DIRETO com o Google — valida assinatura,
+    //    expiração, issuer e audience localmente, sem precisar de rede/API key.
+    //    Nunca confie apenas nos dados que o client mandou no body sem essa checagem.
     let googleProfile;
     try {
-      const { data } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-        params: { access_token: idToken }
+      const ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: GOOGLE_CLIENT_IDS
       });
-
-      console.log('Google profile data:', data);
-      googleProfile = data; // { sub, email, email_verified, name, picture, ... }
+      googleProfile = ticket.getPayload(); // { sub, email, email_verified, name, picture, ... }
     } catch (err) {
-      console.error('Erro ao verificar token do Google:', err.response?.data || err.message);
+      console.error('Erro ao verificar idToken do Google:', err.message);
       return res.status(401).json({
         success: false,
         message: 'Token do Google inválido ou expirado.'
       });
     }
-
-    console.log(googleProfile)
 
     const userId = googleProfile.sub; // Google user ID
 
