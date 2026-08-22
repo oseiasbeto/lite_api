@@ -31,8 +31,11 @@ const authGoogle = async (req, res) => {
       const { data } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
         params: { access_token: idToken }
       });
+
+      console.log('Google profile data:', data);
       googleProfile = data; // { sub, email, email_verified, name, picture, ... }
     } catch (err) {
+      console.error('Erro ao verificar token do Google:', err.response?.data || err.message);
       return res.status(401).json({
         success: false,
         message: 'Token do Google inválido ou expirado.'
@@ -79,6 +82,7 @@ const authGoogle = async (req, res) => {
 
     // 5. Conta desativada (soft delete)
     if (user?.is_deleted) {
+      console.log('Conta desativada:', user._id);
       return res.status(400).json({
         success: false,
         message: 'Esta conta foi desativada.'
@@ -87,6 +91,7 @@ const authGoogle = async (req, res) => {
 
     // 6. 2FA (se ativado)
     if (user?.two_factor_enabled) {
+      console.log('2FA necessária para usuário:', user._id);
       return res.status(200).json({
         success: true,
         requires_2fa: true,
