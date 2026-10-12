@@ -1,7 +1,7 @@
 // modules/stories/controllers/storyController.js
 const mongoose = require("mongoose");
 const Story = require("../../../models/Story");
-const StoryView = require("../../../models/StoryView");
+const StoryView = require("../../../models/Storyview");
 const User = require("../../../models/User");
 const Conversation = require("../../../models/Conversation");
 const { emitToUser } = require("../../../services/socket");
