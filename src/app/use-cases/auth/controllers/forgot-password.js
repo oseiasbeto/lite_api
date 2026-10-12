@@ -13,6 +13,7 @@ const forgotPassword = async (req, res) => {
 
         const user = await User.findOne({ email, account_verification_status: 'verified' });
 
+        console.log("Usuário encontrado:", user) //
         if (!user) {
             return res.status(400).json({ message: "Usuário não encontrado." }); // Retorna erro se o usuário não for encontrado
         }

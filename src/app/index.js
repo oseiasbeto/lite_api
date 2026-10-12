@@ -27,6 +27,7 @@ const conversations = require("./use-cases/conversations/conversations.routes")
 const posts = require("./use-cases/posts/posts.routes")
 const comments = require("./use-cases/comments/comments.routes")
 const topics = require("./use-cases/topics/topics.routes")
+const stories = require("./use-cases/stories/stories.routes")
 
 // Registrando as rotas no aplicativo
 app.use("/v1/auth", auth) // Rotas de autenticação
@@ -37,6 +38,7 @@ app.use("/v1/notifications", notifications)
 app.use("/v1/posts", posts) // Rotas de posts
 app.use("/v1/comments", comments) // Rotas de comentarios
 app.use("/v1/topics", topics) 
+app.use("/v1/stories", stories) // Rotas de stories
 
 // Rota de boas-vindas
 app.get("/", (req, res) => {

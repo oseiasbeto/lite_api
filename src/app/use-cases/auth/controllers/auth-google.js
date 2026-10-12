@@ -23,8 +23,7 @@ const googleClient = new OAuth2Client();
 const authGoogle = async (req, res) => {
   try {
     const { idToken } = req.body;
-
-    console.log(req.body)
+    
     // 1. Validação básica do payload
     if (!idToken) {
       return res.status(400).json({

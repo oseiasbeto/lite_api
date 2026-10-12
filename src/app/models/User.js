@@ -77,8 +77,9 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
     birth_date: {
-      type: Date,
-      required: false,
+      month: { type: Number, min: 1, max: 12 },
+      day: { type: Number, min: 1, max: 31 },
+      year: { type: Number, min: 1900, max: new Date().getFullYear() },
     },
     website: {
       type: String,
